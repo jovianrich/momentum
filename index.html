@@ -46,6 +46,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15p
 *{box-sizing:border-box}
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
+html,button,a,input,select,textarea,label{touch-action:manipulation}
 :focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 .app{height:100%;display:flex;flex-direction:column;max-width:460px;margin:0 auto;position:relative;background-image:radial-gradient(circle at 50% 34%,var(--glow),transparent 46%)}
 main{flex:1 1 auto;overflow-y:auto;padding-top:calc(16px + env(safe-area-inset-top,0px));padding-bottom:16px;padding-left:max(18px,env(safe-area-inset-left,0px));padding-right:max(18px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:12px}
@@ -61,7 +62,7 @@ main{flex:1 1 auto;overflow-y:auto;padding-top:calc(16px + env(safe-area-inset-t
 .stat{display:flex;flex-direction:column;gap:1px;min-width:0}
 .stat b{font-family:var(--mono);font-weight:600;font-size:17px}
 .stat .sub{font-size:11px}
-.field{height:40px;border:1px solid var(--fieldline);border-radius:9px;background:var(--field);padding:0 10px;min-width:0}
+.field{font-size:16px;height:40px;border:1px solid var(--fieldline);border-radius:9px;background:var(--field);padding:0 10px;min-width:0}
 textarea.field{height:auto;min-height:60px;padding:8px 10px;resize:vertical;width:100%}
 .btn{height:40px;padding:0 16px;border:1px solid var(--fieldline);border-radius:10px;background:var(--surface);font-weight:700;font-size:14px}
 .btn.primary{background:var(--blue);border-color:var(--blue);color:var(--on-blue);font-weight:800}
@@ -198,6 +199,7 @@ h2{font-size:17px}
   let days={};            // "YYYY-MM-DD" -> {words, goal, project, note}
   let settings=defaults();
   let view="today", calSel=todayK, calY=today.getFullYear(), calM=today.getMonth();
+  let completing=null;
   let sheetRange="week", editingProj=null, armedDelete=false, pendingRestore=null;
   let store=null;
 
@@ -211,7 +213,9 @@ h2{font-size:17px}
     const o=Object.assign(defaults(), s||{});
     if(!Array.isArray(o.projects)) o.projects=defaults().projects;
     o.projects=o.projects.map(p=>({id:String(p.id), name:String(p.name||"Untitled"), target:+p.target||0, deadline:p.deadline||"",
-      stage:STAGES.includes(p.stage)?p.stage:(p.id==="ubiz"?"Revising":"Drafting")}));
+      stage:STAGES.includes(p.stage)?p.stage:(p.id==="ubiz"?"Revising":"Drafting"),
+      completedAt:p.completedAt||"", draftDoneAt:p.draftDoneAt||"", revDoneAt:p.revDoneAt||"", draftWords:+p.draftWords||0,
+      revision:p.revision?{cutGoal:+p.revision.cutGoal||0, chapterGoal:+p.revision.chapterGoal||0, dailyCut:+p.revision.dailyCut||0, dailyChapters:+p.revision.dailyChapters||0, startedAt:p.revision.startedAt||""}:null}));
     if(!o.projects.some(p=>p.id===o.current)) o.current=o.projects[0]?o.projects[0].id:"";
     o.goal=+o.goal>0?+o.goal:500;
     return o;
@@ -221,24 +225,35 @@ h2{font-size:17px}
     if(Array.isArray(v.items)){ // earlier version: several entries per day
       let w=0, best={}, p=""; v.items.forEach(i=>{ w+=+i.w||0; best[i.p||""]=(best[i.p||""]||0)+(+i.w||0); });
       let m=-1; for(const k in best) if(best[k]>m){m=best[k];p=k;}
-      return {words:w, goal:+v.goal||0, project:p, note:v.note||""};
+      return {words:w, goal:+v.goal||0, project:p, note:v.note||"", cut:0, chapters:0, rev:null};
     }
-    return {words:+v.words||0, goal:+v.goal||0, project:v.project||"", note:v.note||""};
+    return {words:+v.words||0, goal:+v.goal||0, project:v.project||"", note:v.note||"", cut:+v.cut||0, chapters:+v.chapters||0,
+      rev:v.rev&&(+v.rev.cut>0||+v.rev.ch>0)?{cut:+v.rev.cut||0, ch:+v.rev.ch||0}:null};
   }
 
   // ---------- derived ----------
   const W = k => days[k] ? days[k].words : 0;
   const G = k => (days[k] && days[k].goal) || settings.goal;
-  function startKey(){ let s=settings.start||todayK; for(const k in days) if(k<s && days[k].words>0) s=k; return s; }
+  const CUT = k => days[k] ? (days[k].cut||0) : 0;
+  const CH = k => days[k] ? (days[k].chapters||0) : 0;
+  const logged = d => d && (d.words>0 || d.cut>0 || d.chapters>0);
+  // a day's progress as a multiple of its target: new words, or revision work on revision days
+  function revRatio(cut,ch,t){ if(!t) return 0; return Math.max(t.cut>0?cut/t.cut:0, t.ch>0?ch/t.ch:0); }
+  function ratioOf(d){ if(!d) return 0; return Math.max((d.words||0)/(d.goal||settings.goal), revRatio(d.cut||0,d.chapters||0,d.rev)); }
+  const R = k => ratioOf(days[k]);
+  function tierR(r){ if(r>=3) return "beyond"; if(r>=2) return "double"; if(r>=1) return "met"; if(r>0) return "part"; return "none"; }
+  const projOf = id => settings.projects.find(p=>p.id===id);
+  const revTarget = p => p && p.stage==="Revising" && p.revision && (p.revision.dailyCut>0||p.revision.dailyChapters>0) ? {cut:p.revision.dailyCut, ch:p.revision.dailyChapters} : null;
+  function startKey(){ let s=settings.start||todayK; for(const k in days) if(k<s && logged(days[k])) s=k; return s; }
   function tierOf(w,g){ if(w>=3*g) return "beyond"; if(w>=2*g) return "double"; if(w>=g) return "met"; if(w>0) return "part"; return "none"; }
   function status(k){
     if(k>todayK) return "future";
-    const t=tierOf(W(k),G(k));
+    const t=tierR(R(k));
     if(t!=="none") return t;
     if(k===todayK) return "pending";
     return k<startKey() ? "before" : "miss";
   }
-  const met = k => W(k)>=G(k);
+  const met = k => R(k)>=1;
   function streak(){
     const s=startKey(); let n=0, d=met(todayK)?new Date(today):addDays(today,-1);
     while(key(d)>=s && met(key(d))){ n++; d=addDays(d,-1); }
@@ -259,20 +274,26 @@ h2{font-size:17px}
     if(from<s) from=s;
     let days_=0,m=0,dbl=0,bey=0;
     for(let d=parse(from); key(d)<=todayK; d=addDays(d,1)){
-      const k=key(d), w=W(k), g=G(k);
-      if(k===todayK && w<g) continue;
-      days_++; if(w>=g)m++; if(w>=2*g)dbl++; if(w>=3*g)bey++;
+      const k=key(d), r=R(k);
+      if(k===todayK && r<1) continue;
+      days_++; if(r>=1)m++; if(r>=2)dbl++; if(r>=3)bey++;
     }
     return {days:days_, met:m, dbl, bey, pct: days_?Math.round(100*m/days_):null, from, to: met(todayK)?todayK:key(addDays(today,-1))};
   }
   function yearStats(){
     const y=String(today.getFullYear()); let w=0,written=0,hit=0;
-    for(const k in days) if(k.startsWith(y)){ const x=days[k]; w+=x.words; if(x.words>0) written++; if(x.words>=G(k)) hit++; }
+    for(const k in days) if(k.startsWith(y)){ const x=days[k]; w+=x.words; if(logged(x)) written++; if(R(k)>=1) hit++; }
     return {w,written,hit};
   }
   function totalWords(){ let t=0; for(const k in days) t+=days[k].words; return t; }
   function projTotals(year){
     const t={}; for(const k in days){ if(year && !k.startsWith(year)) continue; const p=days[k].project||""; t[p]=(t[p]||0)+days[k].words; } return t;
+  }
+  function projRev(pid){
+    let cut=0, ch=0, first=null, ch14=0; const from14=key(addDays(today,-13));
+    for(const k in days){ const x=days[k]; if(x.project!==pid || !(x.cut>0||x.chapters>0)) continue; cut+=x.cut||0; ch+=x.chapters||0; if(!first||k<first) first=k; if(k>=from14) ch14+=x.chapters||0; }
+    let span=first ? diff(first<from14?from14:first, todayK)+1 : 0;
+    return {cut, ch, chPace: span? ch14/span : 0};
   }
   function projPace(pid){
     let first=null; for(const k in days) if(days[k].project===pid && days[k].words>0 && (!first||k<first)) first=k;
@@ -288,8 +309,9 @@ h2{font-size:17px}
     const streaks=STREAK_TROPHIES.map(([n,name])=>({n,name,count:rs.filter(r=>r>=n).length}));
     const best=rs.length?Math.max(...rs):0;
     const next=STREAK_TROPHIES.find(([n])=>n>cur) || STREAK_TROPHIES[STREAK_TROPHIES.length-1];
-    return {total, wordCount, nextWords:(wordCount+1)*5000, streaks, best, cur, next,
-      earned: wordCount + streaks.reduce((s,x)=>s+x.count,0)};
+    const drafts=settings.projects.filter(p=>p.draftDoneAt).length, revs=settings.projects.filter(p=>p.revDoneAt).length;
+    return {total, wordCount, nextWords:(wordCount+1)*5000, streaks, best, cur, next, drafts, revs,
+      earned: wordCount + streaks.reduce((s,x)=>s+x.count,0) + drafts + revs};
   }
   const earnedKeys = () => { const t=trophies(); return ["w"+t.wordCount].concat(t.streaks.map(s=>s.n+":"+s.count)); };
 
@@ -320,15 +342,33 @@ h2{font-size:17px}
     const col={none:"var(--muted)",part:"var(--muted)",met:"var(--blue-ink)",double:"var(--gold-ink)",beyond:"var(--pink-ink)"}[t];
     return fmt(w)+' of '+fmt(g)+' words today · <span style="color:'+col+'">'+txt+'</span>';
   }
+  const plural = (n,w) => n+" "+w+(n===1?"":"s");
+  function targetText(t){ return [t.ch>0?plural(t.ch,"chapter"):"", t.cut>0?fmt(t.cut)+" words cut":""].filter(Boolean).join(" or "); }
+  function revLine(cut,ch,t){
+    const r=revRatio(cut,ch,t), tier=tierR(r);
+    const txt={none:"Goal: "+targetText(t), part:"Goal: "+targetText(t), met:"Target met", double:"Double target!", beyond:r.toFixed(1)+"× target!"}[tier];
+    const col={none:"var(--muted)",part:"var(--muted)",met:"var(--blue-ink)",double:"var(--gold-ink)",beyond:"var(--pink-ink)"}[tier];
+    return plural(ch,"chapter")+' · '+fmt(cut)+' cut today · <span style="color:'+col+'">'+txt+'</span>';
+  }
+  function miniBar(label,val,goal,color){
+    const pct=goal>0?Math.min(100,100*val/goal):0;
+    return '<div class="row"><span class="muted" style="font-size:11px;width:62px;flex:0 0 auto">'+label+'</span><div class="bar" style="flex:1"><span style="width:'+pct+'%;background:'+color+'"></span></div><span class="mono muted" style="font-size:11px">'+fmt(val)+(goal>0?' / '+fmt(goal):'')+'</span></div>';
+  }
   function projOptions(sel){
-    return '<option value="">No project</option>'+settings.projects.map(p=>'<option value="'+esc(p.id)+'"'+(p.id===sel?" selected":"")+'>'+esc(p.name)+'</option>').join("");
+    return '<option value="">No project</option>'+settings.projects.filter(p=>p.stage!=="Done"||p.id===sel).map(p=>'<option value="'+esc(p.id)+'"'+(p.id===sel?" selected":"")+'>'+esc(p.name)+'</option>').join("");
   }
 
   function viewToday(){
     const w=W(todayK), g=G(todayK), st=streak(), ys=yearStats(), tr=trophies();
     const cur=settings.projects.find(p=>p.id===settings.current), pt=projTotals();
     let projLine="";
-    if(cur){
+    const rt=revTarget(cur);
+    if(cur && cur.stage==="Revising"){
+      const rv=projRev(cur.id);
+      projLine = cur.revision
+        ? miniBar("Words cut",rv.cut,cur.revision.cutGoal,"var(--pink)")+miniBar("Chapters",rv.ch,cur.revision.chapterGoal,"var(--gold)")
+        : '<div class="between"><span class="muted" style="font-size:12px">Revising</span><button class="btn quiet" style="height:28px;padding:0;font-size:12px" data-act="revgoals" data-v="'+esc(cur.id)+'">Set revision goals</button></div>';
+    } else if(cur){
       const tot=pt[cur.id]||0;
       projLine = cur.target>0
         ? '<div class="row"><div class="bar" style="flex:1"><span style="width:'+Math.min(100,100*tot/cur.target)+'%"></span></div><span class="mono muted" style="font-size:11px">'+fmt(tot)+' / '+fmt(cur.target)+'</span></div>'
@@ -342,16 +382,17 @@ h2{font-size:17px}
     '</div>'+
     '<div class="card" style="display:flex;flex-direction:column;gap:8px">'+
       '<div class="row"><label class="label" for="curProj" style="flex:0 0 auto">Writing on</label>'+
-      '<select id="curProj" class="field" style="flex:1;font-weight:800;font-size:15px">'+projOptions(settings.current)+'</select></div>'+
+      '<select id="curProj" class="field" style="flex:1;font-weight:800;font-size:16px">'+projOptions(settings.current)+'</select></div>'+
       projLine+
     '</div>'+
     '<div class="ringwrap">'+
-      '<div class="ring"><div id="ringArt">'+ringSVG(w,g)+'</div>'+
+      '<div class="ring"><div id="ringArt">'+(rt?ringSVG(revRatio(CUT(todayK),CH(todayK),rt),1):ringSVG(w,g))+'</div>'+
         '<button class="streakbtn" data-act="sheet" aria-label="'+st+'-day streak. Show on-target rates"><span class="n mono">'+st+'</span><span class="t">day streak</span><span class="pill" style="margin-top:4px">On-target rates ›</span></button>'+
       '</div>'+
-      '<span id="tierLine" style="font-size:14px;font-weight:800;text-align:center">'+tierLine(w,g)+'</span>'+
+      '<span id="tierLine" style="font-size:14px;font-weight:800;text-align:center">'+(rt?revLine(CUT(todayK),CH(todayK),rt):tierLine(w,g))+'</span>'+
       '<div class="legend"><span><i style="background:var(--blue)"></i>Target</span><span><i style="background:var(--gold)"></i>Double</span><span><i style="background:var(--pink)"></i>More than double</span></div>'+
     '</div>'+
+    (rt ? revForm(cur,rt) :
     '<form class="card" id="todayForm" style="display:flex;flex-direction:column;gap:10px">'+
       '<div class="row" style="align-items:flex-end">'+
         '<label for="todayWords" style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px"><span class="label">Today\'s word total</span>'+
@@ -360,7 +401,7 @@ h2{font-size:17px}
       '</div>'+
       '<div class="between"><label for="goalIn" class="muted" style="font-size:13px">My daily target</label>'+
         '<div class="row"><input id="goalIn" class="field mono" type="number" inputmode="numeric" min="50" step="50" value="'+settings.goal+'" style="width:84px;height:34px;text-align:right"><span class="muted" style="font-size:13px">words</span></div></div>'+
-    '</form>'+
+    '</form>')+
     '<div class="band grid3">'+
       '<div class="stat"><span class="label">'+today.getFullYear()+' words</span><b style="font-size:20px">'+fmt(ys.w)+'</b></div>'+
       '<div class="stat"><span class="sub">days written</span><b>'+ys.written+'</b></div>'+
@@ -373,6 +414,21 @@ h2{font-size:17px}
       '<span style="color:var(--gold-ink)">'+ICON.right.replace('stroke-width','stroke="currentColor" stroke-width')+'</span></button>';
   }
 
+  function revForm(cur,rt){
+    const d=days[todayK], has=d&&(d.cut>0||d.chapters>0);
+    return '<form class="card" id="todayForm" data-mode="rev" style="display:flex;flex-direction:column;gap:10px">'+
+      '<div class="row" style="align-items:flex-end">'+
+        '<label for="revCh" style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px"><span class="label">Chapters revised</span>'+
+        '<input id="revCh" class="field big-input" type="number" inputmode="numeric" min="0" placeholder="0" value="'+(has?d.chapters:"")+'"></label>'+
+        '<label for="revCut" style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px"><span class="label">Words cut</span>'+
+        '<input id="revCut" class="field big-input" type="number" inputmode="numeric" min="0" placeholder="0" value="'+(has?d.cut:"")+'"></label>'+
+        '<button class="btn primary" type="submit" style="height:46px;padding:0 16px">Save</button>'+
+      '</div>'+
+      '<div class="between"><span class="muted" style="font-size:13px">Daily target: '+targetText(rt)+'</span>'+
+        '<button class="btn quiet" type="button" data-act="revgoals" data-v="'+esc(cur.id)+'" style="height:28px;padding:0;font-size:12px">Change</button></div>'+
+    '</form>';
+  }
+
   function viewCalendar(){
     const first=new Date(calY,calM,1), dim=new Date(calY,calM+1,0).getDate();
     let cells="", mw=0, mt=0, mm=0, md=0;
@@ -381,13 +437,13 @@ h2{font-size:17px}
       const k=key(new Date(calY,calM,n)), st=status(k), w=W(k), note=days[k]&&days[k].note;
       mw+=w; if(st==="met"||st==="double"||st==="beyond"){mm++;} if(st==="double"||st==="beyond")md++;
       if(["met","double","beyond","part","miss"].includes(st)) mt++;
-      const sw = w ? (w>=1000?(w/1000).toFixed(1).replace(/\.0$/,"")+"k":w) : "";
+      const sw = w ? (w>=1000?(w/1000).toFixed(1).replace(/\.0$/,"")+"k":w) : CH(k) ? CH(k)+"ch" : CUT(k) ? "−"+(CUT(k)>=1000?(CUT(k)/1000).toFixed(1).replace(/\.0$/,"")+"k":CUT(k)) : "";
       cells+='<button class="day '+st+(k===todayK?" today":"")+(k===calSel?" sel":"")+'" data-act="pick" data-v="'+k+'"'+(st==="future"?" disabled":"")+
         ' aria-label="'+MON[calM]+' '+n+(w?", "+fmt(w)+" words":"")+'"><span>'+n+'</span><small>'+sw+'</small>'+(note?'<span class="nt"></span>':'')+'</button>';
     }
     const isNow=calY===today.getFullYear()&&calM===today.getMonth();
     const sd=parse(calSel), sw_=W(calSel), sg=G(calSel), sst=status(calSel), d=days[calSel];
-    const stName={met:"Target met",double:"Double target",beyond:"More than double",part:fmt(sg-sw_)+" short",miss:"Missed",pending:"Not logged yet",before:"Before you started"}[sst]||"";
+    const stName={met:"Target met",double:"Double target",beyond:"More than double",part:"Under target",miss:"Missed",pending:"Not logged yet",before:"Before you started"}[sst]||"";
     const stCol={met:"var(--blue-ink)",double:"var(--gold-ink)",beyond:"var(--pink-ink)"}[sst]||"var(--muted)";
     return ''+
     '<div class="between"><div><div class="eyebrow">CALENDAR</div><h1>'+MON[calM]+' '+calY+'</h1></div>'+
@@ -402,6 +458,9 @@ h2{font-size:17px}
       '<div class="row" style="align-items:flex-end"><label for="dayWords" style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px"><span class="label">Word total for this day</span>'+
         '<input id="dayWords" class="field big-input" style="height:42px;font-size:19px" type="number" inputmode="numeric" min="0" placeholder="0" value="'+(d?sw_:"")+'"></label>'+
         '<button class="btn primary" type="submit" style="height:42px">Save</button></div>'+
+      ((d&&(d.rev||d.cut>0||d.chapters>0)) || revTarget(projOf(d?d.project:settings.current)) ?
+        '<div class="row"><label for="dayCh" style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px"><span class="label">Chapters revised</span><input id="dayCh" class="field mono" type="number" min="0" inputmode="numeric" placeholder="0" value="'+(d&&d.chapters?d.chapters:"")+'"></label>'+
+        '<label for="dayCut" style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px"><span class="label">Words cut</span><input id="dayCut" class="field mono" type="number" min="0" inputmode="numeric" placeholder="0" value="'+(d&&d.cut?d.cut:"")+'"></label></div>' : '')+
       '<div class="row"><label for="dayProj" class="label" style="flex:0 0 auto">Project</label><select id="dayProj" class="field" style="flex:1">'+projOptions(d?d.project:settings.current)+'</select></div>'+
       '<textarea id="dayNote" class="field" placeholder="Note for this day: what you worked on, how it went">'+esc(d?d.note:"")+'</textarea>'+
       (d?'<button class="btn danger" type="button" data-act="clearday" style="align-self:flex-start;height:30px;padding:0">Clear this day</button>':'<span class="note" style="text-align:left">Tap any past day to fill in or fix its total.</span>')+
@@ -410,10 +469,14 @@ h2{font-size:17px}
 
   function viewProjects(){
     const pt=projTotals(), yt=projTotals(String(today.getFullYear()));
-    const list=settings.projects.slice().sort((a,b)=>(b.id===settings.current)-(a.id===settings.current));
+    const rank=p=>p.id===settings.current?0:(p.stage==="Done"?2:1);
+    const list=settings.projects.slice().sort((a,b)=>rank(a)-rank(b));
     let cards=list.map(p=>{
       if(editingProj===p.id) return projForm(p);
       const tot=pt[p.id]||0, pace=projPace(p.id), cur=p.id===settings.current;
+      if(completing && completing.id===p.id) return completeCard(p,tot);
+      if(p.stage==="Done") return doneCard(p,tot);
+      if(p.stage==="Revising") return revCard(p,tot,cur);
       let status="";
       if(p.target>0){
         const left=p.target-tot;
@@ -434,7 +497,9 @@ h2{font-size:17px}
         (p.target>0?'<div class="bar" style="height:8px"><span style="width:'+Math.min(100,100*tot/p.target)+'%"></span></div>':'')+
         (p.target>0?'<div class="grid3"><div class="stat"><span class="sub muted">pace</span><b style="font-size:14px">'+(pace?fmt(pace)+"/day":"–")+'</b></div><div class="stat"><span class="sub muted">done around</span><b style="font-size:14px">'+finish+'</b></div><div class="stat"><span class="sub muted">deadline</span><b style="font-size:14px">'+(p.deadline?short(p.deadline):"–")+'</b></div></div>':'')+
         status+
-        (!cur?'<button class="btn" data-act="setcur" data-v="'+esc(p.id)+'">Write on this</button>':'')+
+        '<div class="row" style="flex-wrap:wrap">'+(!cur?'<button class="btn" data-act="setcur" data-v="'+esc(p.id)+'">Write on this</button>':'')+
+        (p.stage==="Planning"||p.stage==="Drafting"?'<button class="btn" data-act="complete" data-v="'+esc(p.id)+'">Mark draft complete</button>':
+         '<button class="btn" data-act="finish" data-v="'+esc(p.id)+'">Mark finished</button>')+'</div>'+
       '</div>';
     }).join("");
     if(editingProj==="new") cards=projForm(null)+cards;
@@ -463,6 +528,59 @@ h2{font-size:17px}
       '<p class="muted" style="margin:0;font-size:13px">Your ledger lives on this device. Save a backup file now and then, and use it to move to a new phone.</p>'+
       '<div class="row" style="flex-wrap:wrap"><button class="btn" data-act="backup">Save a backup</button>'+
       '<label class="btn quiet" style="display:inline-flex;align-items:center;cursor:pointer">Restore from file<input id="restoreFile" type="file" accept="application/json,.json" hidden></label></div></div>';
+  }
+  function projHead(p,cur){
+    return '<div class="between">'+(cur?'<span class="chip">WRITING ON</span>':'<span></span>')+'<span class="muted" style="font-size:12px">'+esc(p.stage)+'</span></div>'+
+      '<div class="between" style="align-items:flex-start"><h2 style="font-size:'+(cur?20:17)+'px">'+esc(p.name)+'</h2><button class="iconbtn" style="width:36px;height:36px" data-act="editproj" data-v="'+esc(p.id)+'" aria-label="Edit '+esc(p.name)+'">'+ICON.edit+'</button></div>';
+  }
+  function revCard(p,tot,cur){
+    const R_=p.revision, rv=projRev(p.id), start=p.draftWords||tot;
+    let body;
+    if(!R_){
+      body='<p class="muted" style="margin:0;font-size:13px">'+fmt(start)+' words in the draft. Set goals for words to cut and chapters to revise to track this revision.</p>'+
+        '<button class="btn primary" data-act="revgoals" data-v="'+esc(p.id)+'">Set revision goals</button>';
+    } else {
+      const chLeft=Math.max(0,R_.chapterGoal-rv.ch);
+      let fin="–"; if(R_.chapterGoal>0 && chLeft===0) fin="Done"; else if(rv.chPace>0 && chLeft>0){ const f=addDays(today,Math.ceil(chLeft/rv.chPace)); fin=short(key(f))+(f.getFullYear()!==today.getFullYear()?" "+String(f.getFullYear()).slice(2):""); }
+      const cutPct=R_.cutGoal>0?Math.min(100,100*rv.cut/R_.cutGoal):0, chPct=R_.chapterGoal>0?Math.min(100,100*rv.ch/R_.chapterGoal):0;
+      body='<div class="row" style="align-items:baseline"><b class="mono" style="font-size:'+(cur?28:20)+'px;font-weight:600;line-height:1">'+fmt(Math.max(0,start-rv.cut))+'</b><span class="mono muted" style="font-size:13px">words now · draft '+fmt(start)+'</span></div>'+
+        '<div class="between" style="font-size:13px"><span>Words cut</span><span class="mono muted">'+fmt(rv.cut)+(R_.cutGoal?' / '+fmt(R_.cutGoal)+' · '+Math.floor(cutPct)+'%':'')+'</span></div>'+
+        '<div class="bar" style="height:8px"><span style="width:'+cutPct+'%;background:var(--pink)"></span></div>'+
+        '<div class="between" style="font-size:13px"><span>Chapters revised</span><span class="mono muted">'+rv.ch+(R_.chapterGoal?' / '+R_.chapterGoal+' · '+Math.floor(chPct)+'%':'')+'</span></div>'+
+        '<div class="bar" style="height:8px"><span style="width:'+chPct+'%;background:var(--gold)"></span></div>'+
+        '<div class="grid3"><div class="stat"><span class="sub muted">pace</span><b style="font-size:14px">'+(rv.chPace?(rv.chPace*7).toFixed(1)+" ch/wk":"–")+'</b></div>'+
+        '<div class="stat"><span class="sub muted">done around</span><b style="font-size:14px">'+fin+'</b></div>'+
+        '<div class="stat"><span class="sub muted">daily target</span><b style="font-size:12px;font-family:var(--sans)">'+(revTarget(p)?targetText(revTarget(p)):"–")+'</b></div></div>'+
+        '<div class="row" style="flex-wrap:wrap">'+(!cur?'<button class="btn" data-act="setcur" data-v="'+esc(p.id)+'">Revise this</button>':'')+
+        '<button class="btn" data-act="finishrev" data-v="'+esc(p.id)+'">Revision complete</button>'+
+        '<button class="btn quiet" data-act="revgoals" data-v="'+esc(p.id)+'">Goals</button></div>';
+    }
+    return '<div class="card proj'+(cur?" current":"")+'">'+projHead(p,cur)+body+'</div>';
+  }
+  function doneCard(p,tot){
+    const bits=[]; if(p.draftDoneAt) bits.push("Draft done "+short(p.draftDoneAt)); if(p.revDoneAt) bits.push("revision done "+short(p.revDoneAt));
+    return '<div class="card proj" style="opacity:.85"><div class="between"><span class="chip" style="background:var(--gold);color:#161e27">COMPLETE</span>'+
+      '<button class="btn quiet" style="height:28px;padding:0;font-size:12px" data-act="editproj" data-v="'+esc(p.id)+'">Edit</button></div>'+
+      '<h2>'+esc(p.name)+'</h2><span class="muted" style="font-size:13px">'+fmt(p.draftWords||tot)+' words'+(bits.length?' · '+bits.join(", "):'')+(p.completedAt?' · finished '+short(p.completedAt):'')+'</span></div>';
+  }
+  function completeCard(p,tot){
+    const k=completing.kind;
+    if(k==="draft") return '<div class="card proj" style="border:1.5px solid var(--gold)"><span class="chip" style="background:var(--gold);color:#161e27;align-self:flex-start">DRAFT COMPLETE</span>'+
+      '<h2>'+esc(p.name)+'</h2><p class="muted" style="margin:0;font-size:13px">'+fmt(tot)+' words. What\'s next?</p>'+
+      '<div class="row" style="flex-wrap:wrap"><button class="btn primary" data-act="torevision">Move to revision</button><button class="btn" data-act="finish" data-v="'+esc(p.id)+'">Mark finished</button><button class="btn quiet" data-act="cancelcomplete">Cancel</button></div></div>';
+    if(k==="revdone") return '<div class="card proj" style="border:1.5px solid var(--gold)"><span class="chip" style="background:var(--gold);color:#161e27;align-self:flex-start">REVISION COMPLETE</span>'+
+      '<h2>'+esc(p.name)+'</h2><p class="muted" style="margin:0;font-size:13px">What\'s next for it?</p>'+
+      '<div class="row" style="flex-wrap:wrap"><button class="btn primary" data-act="toquery" data-v="'+esc(p.id)+'">Querying</button><button class="btn" data-act="finish" data-v="'+esc(p.id)+'">Mark finished</button><button class="btn quiet" data-act="cancelcomplete">Cancel</button></div></div>';
+    const r=p.revision||{cutGoal:"",chapterGoal:"",dailyCut:500,dailyChapters:1};
+    return '<form class="card form" id="revGoalForm" style="border:1.5px solid var(--blue)">'+
+      '<div class="full"><h2>Revision goals</h2><span class="muted" style="font-size:13px">'+esc(p.name)+' · draft '+fmt(p.draftWords||tot)+' words</span></div>'+
+      '<label><span class="label">Words to cut</span><input id="rgCut" class="field mono" type="number" min="0" step="500" inputmode="numeric" placeholder="10000" value="'+(r.cutGoal||"")+'"></label>'+
+      '<label><span class="label">Chapters to revise</span><input id="rgCh" class="field mono" type="number" min="0" inputmode="numeric" placeholder="30" value="'+(r.chapterGoal||"")+'"></label>'+
+      '<span class="full label" style="margin-top:4px">Daily target (either one keeps your streak)</span>'+
+      '<label><span class="muted" style="font-size:12px">Chapters a day</span><input id="rgDCh" class="field mono" type="number" min="0" inputmode="numeric" value="'+(r.dailyChapters||"")+'"></label>'+
+      '<label><span class="muted" style="font-size:12px">or words cut a day</span><input id="rgDCut" class="field mono" type="number" min="0" step="50" inputmode="numeric" value="'+(r.dailyCut||"")+'"></label>'+
+      '<div class="full row"><button class="btn primary" type="submit">'+(p.stage==="Revising"?"Save goals":"Start revising")+'</button><button class="btn quiet" type="button" data-act="cancelcomplete">Cancel</button></div>'+
+    '</form>';
   }
   function projForm(p){
     p=p||{name:"",target:"",deadline:"",stage:"Drafting"};
@@ -495,6 +613,11 @@ h2{font-size:17px}
     '</div>'+
     '<div class="between"><span class="label">Streaks</span><span class="muted" style="font-size:12px">current '+t.cur+' · best '+t.best+'</span></div>'+
     '<div class="shelf">'+shelf+'</div>'+
+    '<span class="label">Milestones</span>'+
+    '<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">'+
+      '<div class="tro'+(t.drafts?" got":"")+'">'+CUP.replace('width="24" height="24"','width="26" height="26"')+'<b>Draft done</b><span>'+(t.drafts?'×'+t.drafts:'Finish a draft')+'</span></div>'+
+      '<div class="tro'+(t.revs?" got":"")+'">'+CUP.replace('width="24" height="24"','width="26" height="26"')+'<b>Revision done</b><span>'+(t.revs?'×'+t.revs:'Finish a revision')+'</span></div>'+
+    '</div>'+
     '<div class="card" style="display:flex;flex-direction:column;gap:6px"><div class="between" style="font-size:13px"><b>Next: '+(t.cur>=365?"another Year":nx[1])+'</b><span class="mono muted">'+t.cur+' / '+nx[0]+' days</span></div><div class="bar"><span style="width:'+nxPct+'%"></span></div>'+
     '<span class="muted" style="font-size:12px">A missed day resets the streak. Trophies you\'ve earned stay on the shelf.</span></div>';
   }
@@ -506,7 +629,7 @@ h2{font-size:17px}
     return '<button class="away" data-act="closesheet" aria-label="Close"></button>'+
     '<div class="panel" role="dialog" aria-label="On-target rates">'+
       '<span class="grab"></span>'+
-      '<div class="between"><div><h2 style="font-size:20px">On target</h2><span class="muted" style="font-size:13px">Days you wrote '+fmt(settings.goal)+'+ words</span></div><button class="iconbtn" data-act="closesheet" aria-label="Close">'+ICON.close+'</button></div>'+
+      '<div class="between"><div><h2 style="font-size:20px">On target</h2><span class="muted" style="font-size:13px">Days you hit your daily target</span></div><button class="iconbtn" data-act="closesheet" aria-label="Close">'+ICON.close+'</button></div>'+
       '<div class="grid3">'+segs+'</div>'+
       (s.days ?
         '<div class="between" style="align-items:flex-end"><b class="mono" style="font-size:60px;font-weight:600;line-height:.95;color:var(--blue-ink)">'+s.pct+'%</b><span class="muted" style="font-size:14px;text-align:right">'+s.met+' of '+s.days+' days<br>'+short(s.from)+' – '+short(s.to)+'</span></div>'+
@@ -536,7 +659,7 @@ h2{font-size:17px}
   // ---------- actions ----------
   async function saveDay(k, patch, msg){
     const before=earnedKeys().join("|"), prevBest=trophies();
-    const d=Object.assign({words:0, goal:G(k), project:settings.current, note:""}, days[k]||{}, patch);
+    const d=Object.assign({words:0, goal:G(k), project:settings.current, note:"", cut:0, chapters:0, rev:null}, days[k]||{}, patch);
     if(!days[k]) d.goal=settings.goal;
     days[k]=d; render();
     try{ await store.saveDay(k,d); }catch(e){ toast("Couldn't save. Check your connection and try again."); return; }
@@ -573,6 +696,20 @@ h2{font-size:17px}
       settings=normSettings(pendingRestore.settings); pendingRestore=null; local.persist(); render(); toast("Backup restored");
     }
     else if(a==="cancelrestore"){ pendingRestore=null; render(); }
+    else if(a==="complete"){ completing={id:v,kind:"draft"}; render(); }
+    else if(a==="torevision"){ completing.kind="rev"; render(); }
+    else if(a==="revgoals"){ if(view!=="projects") go("projects"); completing={id:v,kind:"rev"}; render(); }
+    else if(a==="finishrev"){ completing={id:v,kind:"revdone"}; render(); }
+    else if(a==="cancelcomplete"){ completing=null; render(); }
+    else if(a==="finish"||a==="toquery"){
+      const p=projOf(v); if(!p) return; const tot=projTotals()[p.id]||0;
+      if(p.stage==="Planning"||p.stage==="Drafting"){ p.draftDoneAt=p.draftDoneAt||todayK; p.draftWords=p.draftWords||tot; }
+      if(p.stage==="Revising"){ p.revDoneAt=todayK; }
+      if(a==="toquery"){ p.stage="Querying"; }
+      else { p.stage="Done"; p.completedAt=todayK;
+        if(settings.current===p.id){ const nx=settings.projects.find(x=>x.id!==p.id&&x.stage!=="Done"); settings.current=nx?nx.id:""; } }
+      completing=null; saveSettings(a==="toquery"?p.name+" is out querying. Good luck!":"Congratulations on finishing "+p.name+"!");
+    }
     else if(a==="setcur"){ settings.current=v; saveSettings("Now writing on "+(settings.projects.find(p=>p.id===v)||{}).name); }
   });
   document.addEventListener("keydown", e=>{ if(e.key==="Escape" && !$("sheet").hidden) $("sheet").hidden=true; });
@@ -580,14 +717,32 @@ h2{font-size:17px}
   document.addEventListener("submit", e=>{
     e.preventDefault();
     const f=e.target;
-    if(f.id==="todayForm"){
+    if(f.id==="todayForm" && f.dataset.mode==="rev"){
+      const cur=projOf(settings.current), rt=revTarget(cur); if(!rt) return;
+      const ch=Math.max(0,parseInt($("revCh").value,10)||0), cut=Math.max(0,parseInt($("revCut").value,10)||0);
+      if(!ch && !cut){ toast("Enter chapters revised or words cut"); return; }
+      const r=revRatio(cut,ch,rt);
+      saveDay(todayK,{cut, chapters:ch, project:cur.id, rev:rt}, r>=3?"Saved. More than double!":r>=2?"Saved. Double target!":r>=1?"Saved. Target met!":"Saved. Goal: "+targetText(rt));
+    } else if(f.id==="revGoalForm"){
+      const p=projOf(completing&&completing.id); if(!p) return; const tot=projTotals()[p.id]||0;
+      const vals={cutGoal:parseInt($("rgCut").value,10)||0, chapterGoal:parseInt($("rgCh").value,10)||0, dailyCut:parseInt($("rgDCut").value,10)||0, dailyChapters:parseInt($("rgDCh").value,10)||0};
+      if(!vals.dailyCut && !vals.dailyChapters){ toast("Set a daily target: chapters, words cut, or both"); return; }
+      const starting=p.stage!=="Revising";
+      if(starting){ if(p.stage==="Planning"||p.stage==="Drafting") p.draftDoneAt=p.draftDoneAt||todayK; p.stage="Revising"; }
+      p.draftWords=p.draftWords||tot;
+      p.revision=Object.assign({startedAt:(p.revision&&p.revision.startedAt)||todayK}, vals);
+      completing=null; saveSettings(starting?p.name+" moved to revision":"Revision goals saved");
+    } else if(f.id==="todayForm"){
       const raw=$("todayWords").value.trim(); if(raw===""){ toast("Enter today's word total"); return; }
       const w=Math.max(0,parseInt(raw,10)||0);
       saveDay(todayK,{words:w, project:days[todayK]&&days[todayK].project!==undefined&&days[todayK].words>0?days[todayK].project:settings.current},
         w>=3*settings.goal?"Saved. More than double!":w>=2*settings.goal?"Saved. Double target!":w>=settings.goal?"Saved. Target met!":"Saved. "+fmt(settings.goal-w)+" to go");
     } else if(f.id==="dayForm"){
       const raw=$("dayWords").value.trim(); const w=raw===""?0:Math.max(0,parseInt(raw,10)||0);
-      saveDay(calSel,{words:w, project:$("dayProj").value, note:$("dayNote").value},"Saved "+short(calSel));
+      const pj=$("dayProj").value, prev=days[calSel], patch={words:w, project:pj, note:$("dayNote").value};
+      if($("dayCh")){ patch.chapters=Math.max(0,parseInt($("dayCh").value,10)||0); patch.cut=Math.max(0,parseInt($("dayCut").value,10)||0);
+        patch.rev=revTarget(projOf(pj)) || (prev&&prev.rev) || null; }
+      saveDay(calSel,patch,"Saved "+short(calSel));
     } else if(f.id==="projForm"){
       const name=$("pfName").value.trim(); if(!name) return;
       const vals={name, stage:$("pfStage").value, target:parseInt($("pfTarget").value,10)||0, deadline:$("pfDue").value||""};
@@ -603,6 +758,10 @@ h2{font-size:17px}
     if(t.id==="todayWords"){ // live preview of the ring before saving
       const w=Math.max(0,parseInt(t.value,10)||0), g=G(todayK);
       $("ringArt").innerHTML=ringSVG(w,g); $("tierLine").innerHTML=tierLine(w,g);
+    } else if(t.id==="revCh"||t.id==="revCut"){
+      const rt=revTarget(projOf(settings.current)); if(!rt) return;
+      const ch=Math.max(0,parseInt($("revCh").value,10)||0), cut=Math.max(0,parseInt($("revCut").value,10)||0);
+      $("ringArt").innerHTML=ringSVG(revRatio(cut,ch,rt),1); $("tierLine").innerHTML=revLine(cut,ch,rt);
     } else if(t.id==="goalIn"){
       clearTimeout(gt); gt=setTimeout(()=>{ const g=parseInt(t.value,10); if(!(g>0)||g===settings.goal) return;
         settings.goal=g; if(days[todayK]){ days[todayK].goal=g; store.saveDay(todayK,days[todayK]).catch(()=>{}); }
