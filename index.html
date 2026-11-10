@@ -79,14 +79,14 @@ h2{font-size:17px}
 
 /* Today */
 .ringwrap{display:flex;flex-direction:column;align-items:center;gap:2px}
-.ring{position:relative;width:clamp(120px, calc(100vh - 690px), 200px);width:clamp(120px, calc(100dvh - 690px), 200px);aspect-ratio:1;height:auto;container-type:inline-size}
+.ring{position:relative;width:140px;max-width:100%;aspect-ratio:1;height:auto;container-type:inline-size}
 #ringArt,#ringArt svg{width:100%;height:100%}
 .ring svg{display:block}
 .ring circle{transition:stroke-dasharray .45s ease}
 .streakbtn{position:absolute;inset:13%;border-radius:50%;border:0;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:0}
 .streakbtn .n{font-family:var(--mono);font-size:44px;font-size:clamp(30px,28cqw,56px);font-weight:600;line-height:1}
 .streakbtn .t{font-size:12px;font-weight:700;color:var(--muted)}
-.pill{font-size:11px;font-weight:800;color:var(--blue-ink);background:var(--blue-tint);border-radius:999px;padding:3px 9px}
+.pill{white-space:nowrap;font-size:11px;font-weight:800;color:var(--blue-ink);background:var(--blue-tint);border-radius:999px;padding:3px 9px}
 .legend{display:flex;flex-wrap:wrap;justify-content:center;gap:12px;font-size:11px;color:var(--muted)}
 .legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:-1px}
 .big-input{height:44px;font-family:var(--mono);font-size:22px;font-weight:600;border:1.5px solid var(--blue);width:100%}
@@ -651,7 +651,20 @@ h2{font-size:17px}
     $("view").dataset.v=view; if(same) $("view").scrollTop=scroll;
     $("tabs").innerHTML=TABS.map(([v,l])=>'<button data-act="go" data-v="'+v+'"'+(v===view?' aria-current="page"':'')+'>'+ICON[v]+l+'</button>').join("");
     if(!$("sheet").hidden) $("sheet").innerHTML=sheetHTML();
+    fitRing();
   }
+  // size the ring to fill whatever height is left on Today, so the screen fits without scrolling or gaps
+  function fitRing(){
+    const ring=document.querySelector(".ring"), v=$("view"); if(!ring||view!=="today") return;
+    const MIN=120, MAX=240;
+    ring.style.width=MIN+"px";
+    const last=v.lastElementChild, pb=parseFloat(getComputedStyle(v).paddingBottom)||0;
+    const used=last.getBoundingClientRect().bottom - v.getBoundingClientRect().top + v.scrollTop + pb;
+    const extra=Math.floor(v.clientHeight-used);
+    ring.style.width=Math.max(MIN,Math.min(MAX,MIN+extra))+"px";
+  }
+  window.addEventListener("resize",fitRing);
+  if(document.fonts && document.fonts.ready) document.fonts.ready.then(fitRing);
   function go(v){ if(!TABS.some(t=>t[0]===v)) v="today"; view=v; editingProj=null; armedDelete=false; $("sheet").hidden=true; try{ if(location.hash!=="#"+v) history.replaceState(null,"","#"+v); }catch(_){ } render(); $("view").scrollTop=0; }
   window.addEventListener("hashchange",()=>{ const v=location.hash.slice(1); if(v&&v!==view) go(v); });
 
