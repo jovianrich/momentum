@@ -63,7 +63,7 @@ main{flex:1 1 auto;overflow-y:auto;padding-top:calc(16px + env(safe-area-inset-t
 .stat b{font-family:var(--mono);font-weight:600;font-size:17px}
 .stat .sub{font-size:11px}
 .field{font-size:16px;height:40px;border:1px solid var(--fieldline);border-radius:9px;background:var(--field);padding:0 10px;min-width:0}
-textarea.field{height:auto;min-height:60px;padding:8px 10px;resize:vertical;width:100%}
+textarea.field{height:auto;min-height:44px;padding:8px 10px;resize:vertical;width:100%}
 .btn{height:40px;padding:0 16px;border:1px solid var(--fieldline);border-radius:10px;background:var(--surface);font-weight:700;font-size:14px}
 .btn.primary{background:var(--blue);border-color:var(--blue);color:var(--on-blue);font-weight:800}
 .btn.quiet{border-color:transparent;background:none;color:var(--muted)}
@@ -99,7 +99,7 @@ h2{font-size:17px}
 /* Calendar */
 .dows,.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
 .dows span{text-align:center;font-size:11px;font-weight:700;color:var(--muted)}
-.day{aspect-ratio:1;max-width:100%;border-radius:9px;border:1px solid var(--line);background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0;font-family:var(--mono);font-size:13px;line-height:1.15;position:relative}
+.day{height:var(--cell,40px);max-width:100%;border-radius:9px;border:1px solid var(--line);background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0;font-family:var(--mono);font-size:13px;line-height:1.15;position:relative}
 .day small{font-size:9px;opacity:.85}
 .day .nt{position:absolute;top:4px;right:5px;width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.7}
 .day.part{background:var(--blue-tint);border-color:var(--blue-tint)}
@@ -124,10 +124,12 @@ h2{font-size:17px}
 .add-slot{border:1.5px dashed var(--fieldline);border-radius:14px;background:transparent;padding:16px;font-weight:800;display:flex;flex-direction:column;gap:2px;align-items:center}
 
 /* Trophies */
-.shelf{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-.tro{border:1.5px dashed var(--fieldline);border-radius:12px;padding:12px 6px;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;background:var(--surface)}
+.shelf{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.mini{display:flex;flex-direction:column;gap:6px;padding:10px 12px}
+.push{margin-top:auto}
+.tro{min-height:var(--tile,74px);justify-content:center;border:1.5px dashed var(--fieldline);border-radius:12px;padding:8px 4px;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;background:var(--surface)}
 .tro svg{stroke:var(--muted)}
-.tro b{font-size:14px}
+.tro b{font-size:13px;line-height:1.2}
 .tro span{font-size:11px;color:var(--muted)}
 .tro.got{border-style:solid;border-color:var(--gold);background:var(--gold-tint)}
 .tro.got svg{stroke:var(--gold-ink)}
@@ -477,6 +479,7 @@ h2{font-size:17px}
       const tot=pt[p.id]||0, pace=projPace(p.id), cur=p.id===settings.current;
       if(completing && completing.id===p.id) return completeCard(p,tot);
       if(p.stage==="Done") return doneCard(p,tot);
+      if(!cur) return compactCard(p,tot);
       if(p.stage==="Revising") return revCard(p,tot,cur);
       let status="";
       if(p.target>0){
@@ -514,7 +517,7 @@ h2{font-size:17px}
     '<div class="between"><div><div class="eyebrow">PROJECTS</div><h1>Your manuscripts</h1></div>'+
       '<button class="btn primary" data-act="newproj" style="padding:0 14px">+ New</button></div>'+
     (cards || '<button class="add-slot" data-act="newproj"><span>Add your first project</span><span class="muted" style="font-size:12px;font-weight:500">A title, a word target and an optional deadline</span></button>')+
-    (yw?'<div class="band" style="display:flex;flex-direction:column;gap:8px"><span class="label">'+today.getFullYear()+' words by project</span><div style="display:flex;height:10px;border-radius:5px;overflow:hidden;gap:2px">'+seg+'</div><div class="legend" style="justify-content:flex-start;color:var(--band-muted)">'+leg+'</div></div>':'')+
+    (yw?'<div class="band" style="display:flex;flex-direction:column;gap:6px;padding:10px 14px"><span class="label">'+today.getFullYear()+' words by project</span><div style="display:flex;height:10px;border-radius:5px;overflow:hidden;gap:2px">'+seg+'</div><div class="legend" style="justify-content:flex-start;color:var(--band-muted)">'+leg+'</div></div>':'')+
     backupCard();
   }
   function backupCard(){
@@ -525,14 +528,28 @@ h2{font-size:17px}
         '<p class="muted" style="margin:0;font-size:13px">It has '+n+' logged day'+(n===1?"":"s")+(pendingRestore.exported?', saved '+short(pendingRestore.exported.slice(0,10)):"")+'. It replaces everything currently in Momentum on this device.</p>'+
         '<div class="row"><button class="btn primary" data-act="confirmrestore">Restore</button><button class="btn quiet" data-act="cancelrestore">Cancel</button></div></div>';
     }
-    return '<div class="card" style="display:flex;flex-direction:column;gap:10px"><div class="between"><h2>Backup</h2><span class="muted" style="font-size:12px">'+(last?"Last saved "+short(last):"Not backed up yet")+'</span></div>'+
-      '<p class="muted" style="margin:0;font-size:13px">Your ledger lives on this device. Save a backup file now and then, and use it to move to a new phone.</p>'+
-      '<div class="row" style="flex-wrap:wrap"><button class="btn" data-act="backup">Save a backup</button>'+
-      '<label class="btn quiet" style="display:inline-flex;align-items:center;cursor:pointer">Restore from file<input id="restoreFile" type="file" accept="application/json,.json" hidden></label></div></div>';
+    return '<div class="card mini push"><div class="between"><span><b style="font-size:14px">Backup</b> <span class="muted" style="font-size:12px">· '+(last?"saved "+short(last):"not saved yet")+'</span></span>'+
+      '<span class="row" style="gap:4px"><button class="btn" style="height:32px;padding:0 10px;font-size:13px" data-act="backup">Save</button>'+
+      '<label class="btn quiet" style="height:32px;padding:0 6px;font-size:13px;display:inline-flex;align-items:center;cursor:pointer">Restore<input id="restoreFile" type="file" accept="application/json,.json" hidden></label></span></div></div>';
   }
   function projHead(p,cur){
     return '<div class="between">'+(cur?'<span class="chip">WRITING ON</span>':'<span></span>')+'<span class="muted" style="font-size:12px">'+esc(p.stage)+'</span></div>'+
       '<div class="between" style="align-items:flex-start"><h2 style="font-size:'+(cur?20:17)+'px">'+esc(p.name)+'</h2><button class="iconbtn" style="width:36px;height:36px" data-act="editproj" data-v="'+esc(p.id)+'" aria-label="Edit '+esc(p.name)+'">'+ICON.edit+'</button></div>';
+  }
+  function compactCard(p,tot){
+    let line, bar="";
+    if(p.stage==="Revising" && p.revision){
+      const rv=projRev(p.id);
+      line='Cut '+fmt(rv.cut)+(p.revision.cutGoal?' / '+fmt(p.revision.cutGoal):'')+' · Chapters '+rv.ch+(p.revision.chapterGoal?' / '+p.revision.chapterGoal:'');
+      if(p.revision.chapterGoal) bar='<div class="bar"><span style="width:'+Math.min(100,100*rv.ch/p.revision.chapterGoal)+'%;background:var(--gold)"></span></div>';
+    } else if(p.stage==="Revising"){ line=fmt(p.draftWords||tot)+' words · revision goals not set'; }
+    else { line=fmt(tot)+(p.target>0?' / '+fmt(p.target)+' words':' words'); if(p.target>0) bar='<div class="bar"><span style="width:'+Math.min(100,100*tot/p.target)+'%"></span></div>'; }
+    return '<div class="card mini">'+
+      '<div class="between"><b style="font-size:15px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.name)+'</b><span class="muted" style="font-size:12px;flex:0 0 auto">'+esc(p.stage)+'</span></div>'+
+      '<div class="between"><span class="mono muted" style="font-size:12px">'+line+'</span>'+
+        '<span class="row" style="flex:0 0 auto;gap:4px"><button class="btn" style="height:32px;padding:0 10px;font-size:13px" data-act="setcur" data-v="'+esc(p.id)+'">'+(p.stage==="Revising"?"Revise":"Write")+'</button>'+
+        '<button class="iconbtn" style="width:32px;height:32px" data-act="editproj" data-v="'+esc(p.id)+'" aria-label="Edit '+esc(p.name)+'">'+ICON.edit+'</button></span></div>'+
+      bar+'</div>';
   }
   function revCard(p,tot,cur){
     const R_=p.revision, rv=projRev(p.id), start=p.draftWords||tot;
@@ -560,9 +577,9 @@ h2{font-size:17px}
   }
   function doneCard(p,tot){
     const bits=[]; if(p.draftDoneAt) bits.push("Draft done "+short(p.draftDoneAt)); if(p.revDoneAt) bits.push("revision done "+short(p.revDoneAt));
-    return '<div class="card proj" style="opacity:.85"><div class="between"><span class="chip" style="background:var(--gold);color:#161e27">COMPLETE</span>'+
-      '<button class="btn quiet" style="height:28px;padding:0;font-size:12px" data-act="editproj" data-v="'+esc(p.id)+'">Edit</button></div>'+
-      '<h2>'+esc(p.name)+'</h2><span class="muted" style="font-size:13px">'+fmt(p.draftWords||tot)+' words'+(bits.length?' · '+bits.join(", "):'')+(p.completedAt?' · finished '+short(p.completedAt):'')+'</span></div>';
+    return '<div class="card mini" style="opacity:.85"><div class="between"><b style="font-size:15px">'+esc(p.name)+'</b>'+
+      '<span class="row" style="gap:6px"><span class="chip" style="background:var(--gold);color:#161e27">COMPLETE</span><button class="btn quiet" style="height:28px;padding:0;font-size:12px" data-act="editproj" data-v="'+esc(p.id)+'">Edit</button></span></div>'+
+      '<span class="muted" style="font-size:12px">'+fmt(p.draftWords||tot)+' words'+(bits.length?' · '+bits.join(", "):'')+(p.completedAt?' · finished '+short(p.completedAt):'')+'</span></div>';
   }
   function completeCard(p,tot){
     const k=completing.kind;
@@ -599,28 +616,24 @@ h2{font-size:17px}
   function viewTrophies(){
     const t=trophies(), into=t.total%5000, inRun=t.wordCount%10;
     let ticks=""; for(let i=0;i<10;i++) ticks+='<span style="height:8px;border-radius:2px;background:'+(i<inRun?"var(--gold)":"var(--band-track)")+'"></span>';
-    const shelf=t.streaks.map(s=>'<div class="tro'+(s.count?" got":"")+'">'+CUP.replace('width="24" height="24"','width="26" height="26"')+'<b>'+s.name+'</b><span>'+s.n+' days'+(s.count?' · ×'+s.count:'')+'</span></div>').join("");
+    const shelf=t.streaks.map(s=>'<div class="tro'+(s.count?" got":"")+'">'+CUP.replace('width="24" height="24"','width="20" height="20"')+'<b>'+s.name+'</b><span>'+(s.count?'×'+s.count:s.n+' days')+'</span></div>').join("");
     const nx=t.next, nxPct=Math.min(100,100*t.cur/nx[0]);
     return ''+
-    '<div><div class="eyebrow">TROPHIES</div><h1>Trophy shelf</h1><span class="muted" style="font-size:13px">'+t.earned+' earned so far</span></div>'+
-    '<div class="band" style="display:flex;flex-direction:column;gap:12px;padding:16px">'+
+    '<div class="between" style="align-items:flex-end"><div><div class="eyebrow">TROPHIES</div><h1>Trophy shelf</h1></div><span class="muted" style="font-size:13px">'+t.earned+' earned</span></div>'+
+    '<div class="band" style="display:flex;flex-direction:column;gap:8px;padding:12px 14px">'+
       '<span class="label">Every 5,000 words</span>'+
-      '<div class="row" style="gap:14px"><span style="width:64px;height:64px;border-radius:16px;background:var(--gold);display:grid;place-items:center">'+CUP.replace('width="24" height="24"','width="34" height="34" stroke="#161e27"')+'</span>'+
+      '<div class="row" style="gap:14px"><span style="width:52px;height:52px;border-radius:14px;background:var(--gold);display:grid;place-items:center">'+CUP.replace('width="24" height="24"','width="34" height="34" stroke="#161e27"')+'</span>'+
         '<div class="stat"><b style="font-size:34px;line-height:1">×'+t.wordCount+'</b><span class="sub" style="font-size:13px">'+fmt(t.total)+' words all time</span></div></div>'+
       '<div class="between" style="font-size:12px"><span>Next: '+fmt(t.nextWords)+'</span><span class="mono sub">'+fmt(t.nextWords-t.total)+' to go</span></div>'+
       '<div class="gold-bar" style="height:8px;background:var(--band-track)"><span style="width:'+(100*into/5000)+'%"></span></div>'+
-      '<div style="display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:4px">'+ticks+'</div>'+
-      '<span class="sub" style="font-size:12px">'+inRun+' of 10 toward '+fmt((Math.floor(t.wordCount/10)+1)*50000)+' words</span>'+
     '</div>'+
-    '<div class="between"><span class="label">Streaks</span><span class="muted" style="font-size:12px">current '+t.cur+' · best '+t.best+'</span></div>'+
-    '<div class="shelf">'+shelf+'</div>'+
-    '<span class="label">Milestones</span>'+
-    '<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">'+
-      '<div class="tro'+(t.drafts?" got":"")+'">'+CUP.replace('width="24" height="24"','width="26" height="26"')+'<b>Draft done</b><span>'+(t.drafts?'×'+t.drafts:'Finish a draft')+'</span></div>'+
-      '<div class="tro'+(t.revs?" got":"")+'">'+CUP.replace('width="24" height="24"','width="26" height="26"')+'<b>Revision done</b><span>'+(t.revs?'×'+t.revs:'Finish a revision')+'</span></div>'+
+    '<div class="between"><span class="label">Streaks &amp; milestones</span><span class="muted" style="font-size:12px">current '+t.cur+' · best '+t.best+'</span></div>'+
+    '<div class="shelf">'+shelf+
+      '<div class="tro'+(t.drafts?" got":"")+'">'+CUP.replace('width="24" height="24"','width="20" height="20"')+'<b>Draft done</b><span>'+(t.drafts?'×'+t.drafts:'not yet')+'</span></div>'+
+      '<div class="tro'+(t.revs?" got":"")+'">'+CUP.replace('width="24" height="24"','width="20" height="20"')+'<b>Revision done</b><span>'+(t.revs?'×'+t.revs:'not yet')+'</span></div>'+
     '</div>'+
-    '<div class="card" style="display:flex;flex-direction:column;gap:6px"><div class="between" style="font-size:13px"><b>Next: '+(t.cur>=365?"another Year":nx[1])+'</b><span class="mono muted">'+t.cur+' / '+nx[0]+' days</span></div><div class="bar"><span style="width:'+nxPct+'%"></span></div>'+
-    '<span class="muted" style="font-size:12px">A missed day resets the streak. Trophies you\'ve earned stay on the shelf.</span></div>';
+    '<div class="card" style="display:flex;flex-direction:column;gap:6px;padding:10px 12px"><div class="between" style="font-size:13px"><b>Next: '+(t.cur>=365?"another Year":nx[1])+'</b><span class="mono muted">'+t.cur+' / '+nx[0]+' days</span></div><div class="bar"><span style="width:'+nxPct+'%"></span></div>'+
+    '<span class="muted" style="font-size:12px">A missed day resets the streak. Earned trophies stay.</span></div>';
   }
 
   function sheetHTML(){
@@ -654,14 +667,30 @@ h2{font-size:17px}
     fitRing();
   }
   // size the ring to fill whatever height is left on Today, so the screen fits without scrolling or gaps
+  function spare(){
+    const v=$("view"), kids=[...v.children].filter(k=>!k.classList.contains("push"));
+    const last=kids[kids.length-1], pb=parseFloat(getComputedStyle(v).paddingBottom)||0, gap=parseFloat(getComputedStyle(v).rowGap)||0;
+    const pushH=[...v.children].filter(k=>k.classList.contains("push")).reduce((s,k)=>s+k.offsetHeight+gap,0);
+    return Math.floor(v.clientHeight - (last.getBoundingClientRect().bottom - v.getBoundingClientRect().top + v.scrollTop + pb + pushH));
+  }
   function fitRing(){
-    const ring=document.querySelector(".ring"), v=$("view"); if(!ring||view!=="today") return;
-    const MIN=120, MAX=240;
-    ring.style.width=MIN+"px";
-    const last=v.lastElementChild, pb=parseFloat(getComputedStyle(v).paddingBottom)||0;
-    const used=last.getBoundingClientRect().bottom - v.getBoundingClientRect().top + v.scrollTop + pb;
-    const extra=Math.floor(v.clientHeight-used);
-    ring.style.width=Math.max(MIN,Math.min(MAX,MIN+extra))+"px";
+    const v=$("view"); if(!v.lastElementChild) return;
+    if(view==="today"){
+      const ring=document.querySelector(".ring"); if(!ring) return;
+      ring.style.width="120px"; ring.style.width=Math.max(120,Math.min(240,120+spare()))+"px";
+    } else if(view==="calendar"){
+      const cal=document.querySelector(".cal"); if(!cal) return;
+      const rows=Math.ceil(cal.children.length/7), first=cal.querySelector(".day:not(.blank)")||cal.firstElementChild;
+      cal.style.setProperty("--cell","30px");
+      const w=first.getBoundingClientRect().width, h=30+Math.floor(spare()/rows);
+      cal.style.setProperty("--cell",Math.max(30,Math.min(w,h))+"px");
+    } else if(view==="trophies"){
+      const sh=document.querySelector(".shelf"); if(!sh) return;
+      sh.style.setProperty("--tile","64px");
+      const h0=Math.max(64,...[...sh.children].map(t=>t.offsetHeight));
+      sh.style.setProperty("--tile",h0+"px");
+      sh.style.setProperty("--tile",Math.max(h0,Math.min(200,h0+Math.floor(spare()/2)))+"px");
+    }
   }
   window.addEventListener("resize",fitRing);
   if(document.fonts && document.fonts.ready) document.fonts.ready.then(fitRing);
