@@ -95,6 +95,13 @@ h2{font-size:17px}
 .trophy-link.silver{border-color:var(--silver);background:var(--silver-tint)}
 .trophy-link.silver .cup{border-color:var(--silver)}.trophy-link.silver .cup svg{stroke:var(--silver-ink)}
 .trophy-link.silver .gold-bar{background:color-mix(in srgb,var(--silver) 35%,transparent)}.trophy-link.silver .gold-bar>span{background:var(--silver)}
+[data-act="tro"]{cursor:pointer}
+.log{list-style:none;margin:0;padding:0;max-height:46vh;overflow-y:auto;display:flex;flex-direction:column}
+.log li{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
+.log li:last-child{border-bottom:0}
+.log b{font-size:14px}
+.log .p{font-size:12px;color:var(--muted)}
+.log .r{font-family:var(--mono);font-size:11px;color:var(--muted);text-align:right;flex:0 0 auto}
 .gems{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
 .gem{border:1.5px dashed var(--fieldline);border-radius:12px;padding:6px 2px;display:flex;flex-direction:column;align-items:center;gap:1px;text-align:center;background:var(--surface)}
 .gem b{font-size:11px;line-height:1.2}
@@ -217,6 +224,7 @@ h2{font-size:17px}
   let settings=defaults();
   let view="today", calSel=todayK, calY=today.getFullYear(), calM=today.getMonth();
   let completing=null;
+  let sheetKind="rates";
   let sheetRange="week", editingProj=null, armedDelete=false, pendingRestore=null;
   let store=null;
 
@@ -328,6 +336,49 @@ h2{font-size:17px}
     {at:75000,  name:"Amethyst", color:"#9b4dff"},
     {at:100000, name:"Diamond",  color:"#bfefff"}
   ];
+  // every trophy moment, with the day it happened and the project you were on
+  function trophyLog(){
+    const L={silver:[],gold:[],gem:{},streak:{}};
+    GEMS.forEach(g=>L.gem[g.at]=[]); STREAK_TROPHIES.forEach(([n])=>L.streak[n]=[]);
+    let total=0, ns=5000, run=0, rw=0, ng=5000, gemDone={};
+    for(let d=parse(startKey()); key(d)<=todayK; d=addDays(d,1)){
+      const k=key(d), w=W(k), p=days[k]?days[k].project:"";
+      total+=w; while(total>=ns){ L.silver.push({k,p,txt:fmt(ns)+" words total"}); ns+=5000; }
+      if(met(k)){
+        run++; rw+=w;
+        while(rw>=ng){ L.gold.push({k,p,txt:fmt(ng)+" words · day "+run+" of streak"}); ng+=5000; }
+        GEMS.forEach(g=>{ if(rw>=g.at && !gemDone[g.at]){ gemDone[g.at]=1; L.gem[g.at].push({k,p,txt:"day "+run+" of streak"}); } });
+        STREAK_TROPHIES.forEach(([n])=>{ if(run===n) L.streak[n].push({k,p,txt:fmt(rw)+" words in streak"}); });
+      } else if(k!==todayK){ run=0; rw=0; ng=5000; gemDone={}; }
+    }
+    return L;
+  }
+  const longDate = k => { const d=parse(k); return MON[d.getMonth()].slice(0,3)+" "+d.getDate()+", "+d.getFullYear(); };
+  const projName = id => id ? ((projOf(id)||{}).name || "Removed project") : "No project";
+  function troSheet(id){
+    const L=trophyLog(); let title, desc, icon, items=[], how;
+    const silverCup=CUP.replace('width="24" height="24"','width="30" height="30" stroke="#161e27"');
+    if(id==="silver"){ title="Silver trophies"; desc="One for every 5,000 words you write."; icon='<i style="background:var(--silver)">'+silverCup+'</i>'; items=L.silver; how="Write 5,000 words in total."; }
+    else if(id==="gold"){ title="Gold trophies"; desc="5,000 words inside one unbroken streak."; icon='<i style="background:var(--gold)">'+silverCup+'</i>'; items=L.gold; how="Write 5,000 words without missing your daily target."; }
+    else if(id.startsWith("gem:")){ const g=GEMS.find(x=>x.at===+id.slice(4)); title=g.name+" trophy"; desc=fmt(g.at)+" words inside one unbroken streak."; icon='<i style="background:var(--gold-tint)">'+gemCup(g.color,40,false)+'</i>'; items=L.gem[g.at]; how="Write "+fmt(g.at)+" words in a single streak."; }
+    else if(id.startsWith("streak:")){ const n=+id.slice(7), s=STREAK_TROPHIES.find(x=>x[0]===n); title=s[1]+" streak"; desc=n+" days in a row on target."; icon='<i style="background:var(--gold)">'+silverCup+'</i>'; items=L.streak[n]; how="Hit your target "+n+" days in a row."; }
+    else if(id==="draft"||id==="rev"){
+      const f=id==="draft"?"draftDoneAt":"revDoneAt"; title=id==="draft"?"Draft done":"Revision done";
+      desc=id==="draft"?"Finished a draft.":"Finished a revision."; icon='<i style="background:var(--gold)">'+silverCup+'</i>';
+      items=settings.projects.filter(p=>p[f]).map(p=>({k:p[f],p:p.id,txt:id==="draft"?fmt(p.draftWords||0)+" words":p.stage}));
+      how=id==="draft"?"Tap Mark draft complete on a project.":"Tap Revision complete on a project in revision.";
+    }
+    items=items.slice().sort((a,b)=>a.k<b.k?1:a.k>b.k?-1:0);
+    const list = items.length
+      ? '<ul class="log">'+items.map(e=>'<li><span><b>'+longDate(e.k)+'</b><br><span class="p">'+esc(projName(e.p))+'</span></span><span class="r">'+esc(e.txt)+'</span></li>').join("")+'</ul>'
+      : '<p class="muted" style="margin:0">Not earned yet. '+how+'</p>';
+    return '<button class="away" data-act="closesheet" aria-label="Close"></button>'+
+      '<div class="panel" role="dialog" aria-label="'+esc(title)+'"><span class="grab"></span>'+
+      '<div class="between"><div class="medal">'+icon+'<div class="stat"><h2 style="font-size:20px">'+esc(title)+'</h2><span class="muted" style="font-size:13px">'+esc(desc)+'</span></div></div>'+
+      '<button class="iconbtn" data-act="closesheet" aria-label="Close">'+ICON.close+'</button></div>'+
+      (items.length?'<span class="label">Earned '+items.length+' time'+(items.length===1?'':'s')+' · newest first</span>':'')+
+      list+'</div>';
+  }
   function gemCup(color, size, locked){
     const cup=locked?"var(--fieldline)":"#f5b83d", line=locked?"var(--muted)":"#8a5a06";
     return '<svg width="'+size+'" height="'+size+'" viewBox="0 0 40 40" aria-hidden="true">'+
@@ -669,15 +720,15 @@ h2{font-size:17px}
   function viewTrophies(){
     const t=trophies(), into=t.total%5000, inRun=t.wordCount%10;
     let ticks=""; for(let i=0;i<10;i++) ticks+='<span style="height:8px;border-radius:2px;background:'+(i<inRun?"var(--gold)":"var(--band-track)")+'"></span>';
-    const shelf=t.streaks.map(s=>'<div class="tro'+(s.count?" got":"")+'">'+CUP.replace('width="24" height="24"','width="20" height="20"')+'<b>'+s.name+'</b><span>'+(s.count?'×'+s.count:s.n+' days')+'</span></div>').join("");
+    const shelf=t.streaks.map(s=>'<div class="tro'+(s.count?" got":"")+'" role="button" tabindex="0" data-act="tro" data-v="streak:'+s.n+'">'+CUP.replace('width="24" height="24"','width="20" height="20"')+'<b>'+s.name+'</b><span>'+(s.count?'×'+s.count:s.n+' days')+'</span></div>').join("");
     const nx=t.next, nxPct=Math.min(100,100*t.cur/nx[0]);
     return ''+
     '<div class="between" style="align-items:flex-end"><div><div class="eyebrow">TROPHIES</div><h1>Trophy shelf</h1></div><span class="muted" style="font-size:13px">'+t.earned+' earned</span></div>'+
     '<div class="band" style="display:flex;flex-direction:column;gap:6px;padding:12px 14px">'+
       '<span class="label">Word trophies</span>'+
       '<div class="grid3" style="grid-template-columns:1fr 1fr;align-items:center">'+
-        '<div class="medal"><i style="background:var(--silver)">'+CUP.replace('width="24" height="24"','width="28" height="28" stroke="#161e27"')+'</i><div class="stat"><b>×'+t.silver+'</b><span class="sub" style="font-size:12px">silver · every 5,000</span></div></div>'+
-        '<div class="medal"><i style="background:var(--gold)">'+CUP.replace('width="24" height="24"','width="28" height="28" stroke="#161e27"')+'</i><div class="stat"><b>×'+t.gold+'</b><span class="sub" style="font-size:12px">gold · 5,000 in one streak</span></div></div>'+
+        '<div class="medal" role="button" tabindex="0" data-act="tro" data-v="silver"><i style="background:var(--silver)">'+CUP.replace('width="24" height="24"','width="28" height="28" stroke="#161e27"')+'</i><div class="stat"><b>×'+t.silver+'</b><span class="sub" style="font-size:12px">silver · every 5,000</span></div></div>'+
+        '<div class="medal" role="button" tabindex="0" data-act="tro" data-v="gold"><i style="background:var(--gold)">'+CUP.replace('width="24" height="24"','width="28" height="28" stroke="#161e27"')+'</i><div class="stat"><b>×'+t.gold+'</b><span class="sub" style="font-size:12px">gold · 5,000 in one streak</span></div></div>'+
       '</div>'+
       '<div class="between" style="font-size:12px"><span>Next silver: '+fmt(t.nextWords)+' total</span><span class="mono sub">'+fmt(t.nextWords-t.total)+' to go</span></div>'+
       '<div class="gold-bar" style="height:6px;background:var(--band-track)"><span style="width:'+(100*into/5000)+'%;background:var(--silver)"></span></div>'+
@@ -685,12 +736,12 @@ h2{font-size:17px}
       '<div class="gold-bar" style="height:6px;background:var(--band-track)"><span style="width:'+(100*t.goldInto/5000)+'%"></span></div>'+
     '</div>'+
     '<div class="between"><span class="label">Gems · words in one streak</span><span class="muted" style="font-size:12px">'+(t.nextGem?(t.cur?fmt(t.streakWords)+' / '+fmt(t.nextGem.at)+' for '+t.nextGem.name:'start a streak'):'all gems earned')+'</span></div>'+
-    '<div class="gems">'+t.gems.map(g=>'<div class="gem'+(g.count?' got':'')+'" title="'+g.name+': '+fmt(g.at)+' words in one unbroken streak">'+gemCup(g.color,36,!g.count)+
+    '<div class="gems">'+t.gems.map(g=>'<div class="gem'+(g.count?' got':'')+'" role="button" tabindex="0" data-act="tro" data-v="gem:'+g.at+'" title="'+g.name+': '+fmt(g.at)+' words in one unbroken streak">'+gemCup(g.color,36,!g.count)+
       '<b>'+g.name+'</b><span>'+(g.count?'×'+g.count:fmt(g.at/1000)+'K')+'</span></div>').join("")+'</div>'+
     '<div class="between"><span class="label">Streaks &amp; milestones</span><span class="muted" style="font-size:12px">current '+t.cur+' · best '+t.best+'</span></div>'+
     '<div class="shelf">'+shelf+
-      '<div class="tro'+(t.drafts?" got":"")+'">'+CUP.replace('width="24" height="24"','width="20" height="20"')+'<b>Draft done</b><span>'+(t.drafts?'×'+t.drafts:'not yet')+'</span></div>'+
-      '<div class="tro'+(t.revs?" got":"")+'">'+CUP.replace('width="24" height="24"','width="20" height="20"')+'<b>Revision done</b><span>'+(t.revs?'×'+t.revs:'not yet')+'</span></div>'+
+      '<div class="tro'+(t.drafts?" got":"")+'" role="button" tabindex="0" data-act="tro" data-v="draft">'+CUP.replace('width="24" height="24"','width="20" height="20"')+'<b>Draft done</b><span>'+(t.drafts?'×'+t.drafts:'not yet')+'</span></div>'+
+      '<div class="tro'+(t.revs?" got":"")+'" role="button" tabindex="0" data-act="tro" data-v="rev">'+CUP.replace('width="24" height="24"','width="20" height="20"')+'<b>Revision done</b><span>'+(t.revs?'×'+t.revs:'not yet')+'</span></div>'+
     '</div>'+
     '<div class="card" style="display:flex;flex-direction:column;gap:6px;padding:10px 12px"><div class="between" style="font-size:13px"><b>Next: '+(t.cur>=365?"another Year":nx[1])+'</b><span class="mono muted">'+t.cur+' / '+nx[0]+' days</span></div><div class="bar"><span style="width:'+nxPct+'%"></span></div>'+
     '<span class="muted" style="font-size:12px">A missed day resets the streak. Earned trophies stay.</span></div>';
@@ -723,7 +774,7 @@ h2{font-size:17px}
     $("view").innerHTML = view==="calendar"?viewCalendar():view==="projects"?viewProjects():view==="trophies"?viewTrophies():viewToday();
     $("view").dataset.v=view; if(same) $("view").scrollTop=scroll;
     $("tabs").innerHTML=TABS.map(([v,l])=>'<button data-act="go" data-v="'+v+'"'+(v===view?' aria-current="page"':'')+'>'+ICON[v]+l+'</button>').join("");
-    if(!$("sheet").hidden) $("sheet").innerHTML=sheetHTML();
+    if(!$("sheet").hidden) $("sheet").innerHTML = sheetKind==="rates" ? sheetHTML() : troSheet(sheetKind);
     fitRing();
   }
   // size the ring to fill whatever height is left on Today, so the screen fits without scrolling or gaps
@@ -781,7 +832,8 @@ h2{font-size:17px}
     const a=b.dataset.act, v=b.dataset.v;
     if(a==="go") go(v);
     else if(a==="theme") cycleTheme();
-    else if(a==="sheet"){ $("sheet").hidden=false; $("sheet").innerHTML=sheetHTML(); const c=$("sheet").querySelector(".iconbtn"); if(c) c.focus(); }
+    else if(a==="tro"){ sheetKind=v; $("sheet").hidden=false; $("sheet").innerHTML=troSheet(v); const c=$("sheet").querySelector(".iconbtn"); if(c) c.focus(); }
+    else if(a==="sheet"){ sheetKind="rates"; $("sheet").hidden=false; $("sheet").innerHTML=sheetHTML(); const c=$("sheet").querySelector(".iconbtn"); if(c) c.focus(); }
     else if(a==="closesheet"){ $("sheet").hidden=true; }
     else if(a==="range"){ sheetRange=v; $("sheet").innerHTML=sheetHTML(); }
     else if(a==="pick"){ calSel=v; render(); }
@@ -818,6 +870,7 @@ h2{font-size:17px}
     }
     else if(a==="setcur"){ settings.current=v; saveSettings("Now writing on "+(settings.projects.find(p=>p.id===v)||{}).name); }
   });
+  document.addEventListener("keydown", e=>{ const tr=e.target.closest&&e.target.closest('[data-act="tro"]'); if(tr && (e.key==="Enter"||e.key===" ")){ e.preventDefault(); tr.click(); } });
   document.addEventListener("keydown", e=>{ if(e.key==="Escape" && !$("sheet").hidden) $("sheet").hidden=true; });
 
   document.addEventListener("submit", e=>{
