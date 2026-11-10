@@ -95,13 +95,20 @@ h2{font-size:17px}
 .trophy-link.silver{border-color:var(--silver);background:var(--silver-tint)}
 .trophy-link.silver .cup{border-color:var(--silver)}.trophy-link.silver .cup svg{stroke:var(--silver-ink)}
 .trophy-link.silver .gold-bar{background:color-mix(in srgb,var(--silver) 35%,transparent)}.trophy-link.silver .gold-bar>span{background:var(--silver)}
-[data-act="tro"]{cursor:pointer}
+[data-act="tro"]{cursor:pointer;font:inherit;color:inherit;width:100%;margin:0;-webkit-tap-highlight-color:transparent}
+button.medal{background:none;border:0;padding:0;text-align:left}
+button.tro:active,button.gem:active,button.medal:active{transform:scale(.97)}
 .log{list-style:none;margin:0;padding:0;max-height:46vh;overflow-y:auto;display:flex;flex-direction:column}
 .log li{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
 .log li:last-child{border-bottom:0}
 .log b{font-size:14px}
 .log .p{font-size:12px;color:var(--muted)}
 .log .r{font-family:var(--mono);font-size:11px;color:var(--muted);text-align:right;flex:0 0 auto}
+.tro.special.got{background:var(--band);border-color:var(--gold);color:var(--band-ink)}
+.tro.special.got span{color:var(--gold)}
+.plaque{display:flex;align-items:center;gap:14px;padding:12px;border-radius:14px;background:var(--band);color:var(--band-ink);border:1.5px solid var(--gold)}
+.plaque b{font-size:16px;display:block}
+.plaque span{font-size:12px;color:var(--band-muted)}
 .gems{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
 .gem{border:1.5px dashed var(--fieldline);border-radius:12px;padding:6px 2px;display:flex;flex-direction:column;align-items:center;gap:1px;text-align:center;background:var(--surface)}
 .gem b{font-size:11px;line-height:1.2}
@@ -356,6 +363,17 @@ h2{font-size:17px}
   const longDate = k => { const d=parse(k); return MON[d.getMonth()].slice(0,3)+" "+d.getDate()+", "+d.getFullYear(); };
   const projName = id => id ? ((projOf(id)||{}).name || "Removed project") : "No project";
   function troSheet(id){
+    if(id==="draft"){
+      const done=settings.projects.filter(p=>p.draftDoneAt).sort((a,b)=>a.draftDoneAt<b.draftDoneAt?1:-1);
+      return '<button class="away" data-act="closesheet" aria-label="Close"></button>'+
+        '<div class="panel" role="dialog" aria-label="Finished drafts"><span class="grab"></span>'+
+        '<div class="between"><div class="medal"><i style="background:var(--band)">'+draftTrophy(40,!done.length)+'</i><span class="stat"><h2 style="font-size:20px">Finished drafts</h2><span class="muted" style="font-size:13px">One of a kind, for every draft you finish.</span></span></div>'+
+        '<button class="iconbtn" data-act="closesheet" aria-label="Close">'+ICON.close+'</button></div>'+
+        (done.length
+          ? '<div class="log" style="gap:8px">'+done.map(p=>'<div class="plaque">'+draftTrophy(56,false)+'<div style="min-width:0"><b>'+esc(p.name)+'</b><span>Draft finished '+longDate(p.draftDoneAt)+' · '+fmt(p.draftWords||0)+' words</span></div></div>').join("")+'</div>'
+          : '<p class="muted" style="margin:0">No finished drafts yet. When you tap Mark draft complete on a project, its trophy appears here with the title, date and word count.</p>')+
+        '</div>';
+    }
     const L=trophyLog(); let title, desc, icon, items=[], how;
     const silverCup=CUP.replace('width="24" height="24"','width="30" height="30" stroke="#161e27"');
     if(id==="silver"){ title="Silver trophies"; desc="One for every 5,000 words you write."; icon='<i style="background:var(--silver)">'+silverCup+'</i>'; items=L.silver; how="Write 5,000 words in total."; }
@@ -379,6 +397,24 @@ h2{font-size:17px}
       (items.length?'<span class="label">Earned '+items.length+' time'+(items.length===1?'':'s')+' · newest first</span>':'')+
       list+'</div>';
   }
+  // the finished-draft trophy: a manuscript inside a laurel wreath, with a wax seal
+  function draftTrophy(size, locked){
+    const g=locked?"var(--muted)":"#f5b83d", leaf=locked?"var(--fieldline)":"#d9a12b", page=locked?"var(--surface)":"#fffaf0", seal=locked?"var(--fieldline)":"#c8324b";
+    // two laurel branches curving up either side
+    const R=15, cx=20, cy=19, pt=t=>[cx+R*Math.cos(t*Math.PI/180), cy-R*Math.sin(t*Math.PI/180)];
+    let leaves="";
+    for(let i=0;i<6;i++){ [[148+i*19,1],[32-i*19,-1]].forEach(([t,side])=>{ const [x,y]=pt(t);
+      leaves+='<ellipse cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" rx="2.9" ry="1.25" transform="rotate('+(90-t+side*28).toFixed(0)+' '+x.toFixed(1)+' '+y.toFixed(1)+')" fill="'+leaf+'"/>'; }); }
+    const [l0x,l0y]=pt(150), [l1x,l1y]=pt(255), [r0x,r0y]=pt(30), [r1x,r1y]=pt(285);
+    return '<svg width="'+size+'" height="'+size+'" viewBox="0 0 40 40" aria-hidden="true">'+
+      '<path d="M'+l1x.toFixed(1)+' '+l1y.toFixed(1)+'A'+R+' '+R+' 0 0 1 '+l0x.toFixed(1)+' '+l0y.toFixed(1)+'M'+r1x.toFixed(1)+' '+r1y.toFixed(1)+'A'+R+' '+R+' 0 0 0 '+r0x.toFixed(1)+' '+r0y.toFixed(1)+'" fill="none" stroke="'+g+'" stroke-width="1.1" stroke-linecap="round"/>'+leaves+
+      '<rect x="14" y="9" width="12" height="15" rx="1" fill="'+page+'" stroke="'+g+'" stroke-width="1.3" transform="rotate(-6 20 16)"/>'+
+      '<rect x="13.5" y="8.5" width="12" height="15" rx="1" fill="'+page+'" stroke="'+g+'" stroke-width="1.3"/>'+
+      '<path d="M16 12h7M16 14.5h7M16 17h4.5" stroke="'+(locked?"var(--fieldline)":"#c9b48a")+'" stroke-width=".9" stroke-linecap="round"/>'+
+      '<circle cx="23" cy="21.5" r="3" fill="'+seal+'"/><path d="M21.6 21.5l1 1 1.9-2" fill="none" stroke="#fff" stroke-width=".9" stroke-linecap="round" stroke-linejoin="round" opacity="'+(locked?0:1)+'"/>'+
+      '<path d="M14 34h12" stroke="'+g+'" stroke-width="1.6" stroke-linecap="round"/></svg>';
+  }
+  function openTro(id){ sheetKind=id; $("sheet").hidden=false; $("sheet").innerHTML=troSheet(id); const c=$("sheet").querySelector(".iconbtn"); if(c) c.focus(); }
   function gemCup(color, size, locked){
     const cup=locked?"var(--fieldline)":"#f5b83d", line=locked?"var(--muted)":"#8a5a06";
     return '<svg width="'+size+'" height="'+size+'" viewBox="0 0 40 40" aria-hidden="true">'+
@@ -720,15 +756,15 @@ h2{font-size:17px}
   function viewTrophies(){
     const t=trophies(), into=t.total%5000, inRun=t.wordCount%10;
     let ticks=""; for(let i=0;i<10;i++) ticks+='<span style="height:8px;border-radius:2px;background:'+(i<inRun?"var(--gold)":"var(--band-track)")+'"></span>';
-    const shelf=t.streaks.map(s=>'<div class="tro'+(s.count?" got":"")+'" role="button" tabindex="0" data-act="tro" data-v="streak:'+s.n+'">'+CUP.replace('width="24" height="24"','width="20" height="20"')+'<b>'+s.name+'</b><span>'+(s.count?'×'+s.count:s.n+' days')+'</span></div>').join("");
+    const shelf=t.streaks.map(s=>'<button type="button" class="tro'+(s.count?" got":"")+'" data-act="tro" data-v="streak:'+s.n+'">'+CUP.replace('width="24" height="24"','width="20" height="20"')+'<b>'+s.name+'</b><span>'+(s.count?'×'+s.count:s.n+' days')+'</span></button>').join("");
     const nx=t.next, nxPct=Math.min(100,100*t.cur/nx[0]);
     return ''+
     '<div class="between" style="align-items:flex-end"><div><div class="eyebrow">TROPHIES</div><h1>Trophy shelf</h1></div><span class="muted" style="font-size:13px">'+t.earned+' earned</span></div>'+
     '<div class="band" style="display:flex;flex-direction:column;gap:6px;padding:12px 14px">'+
       '<span class="label">Word trophies</span>'+
       '<div class="grid3" style="grid-template-columns:1fr 1fr;align-items:center">'+
-        '<div class="medal" role="button" tabindex="0" data-act="tro" data-v="silver"><i style="background:var(--silver)">'+CUP.replace('width="24" height="24"','width="28" height="28" stroke="#161e27"')+'</i><div class="stat"><b>×'+t.silver+'</b><span class="sub" style="font-size:12px">silver · every 5,000</span></div></div>'+
-        '<div class="medal" role="button" tabindex="0" data-act="tro" data-v="gold"><i style="background:var(--gold)">'+CUP.replace('width="24" height="24"','width="28" height="28" stroke="#161e27"')+'</i><div class="stat"><b>×'+t.gold+'</b><span class="sub" style="font-size:12px">gold · 5,000 in one streak</span></div></div>'+
+        '<button type="button" class="medal" data-act="tro" data-v="silver"><i style="background:var(--silver)">'+CUP.replace('width="24" height="24"','width="28" height="28" stroke="#161e27"')+'</i><span class="stat"><b>×'+t.silver+'</b><span class="sub" style="font-size:12px">silver · every 5,000</span></span></button>'+
+        '<button type="button" class="medal" data-act="tro" data-v="gold"><i style="background:var(--gold)">'+CUP.replace('width="24" height="24"','width="28" height="28" stroke="#161e27"')+'</i><span class="stat"><b>×'+t.gold+'</b><span class="sub" style="font-size:12px">gold · 5,000 in one streak</span></span></button>'+
       '</div>'+
       '<div class="between" style="font-size:12px"><span>Next silver: '+fmt(t.nextWords)+' total</span><span class="mono sub">'+fmt(t.nextWords-t.total)+' to go</span></div>'+
       '<div class="gold-bar" style="height:6px;background:var(--band-track)"><span style="width:'+(100*into/5000)+'%;background:var(--silver)"></span></div>'+
@@ -736,12 +772,12 @@ h2{font-size:17px}
       '<div class="gold-bar" style="height:6px;background:var(--band-track)"><span style="width:'+(100*t.goldInto/5000)+'%"></span></div>'+
     '</div>'+
     '<div class="between"><span class="label">Gems · words in one streak</span><span class="muted" style="font-size:12px">'+(t.nextGem?(t.cur?fmt(t.streakWords)+' / '+fmt(t.nextGem.at)+' for '+t.nextGem.name:'start a streak'):'all gems earned')+'</span></div>'+
-    '<div class="gems">'+t.gems.map(g=>'<div class="gem'+(g.count?' got':'')+'" role="button" tabindex="0" data-act="tro" data-v="gem:'+g.at+'" title="'+g.name+': '+fmt(g.at)+' words in one unbroken streak">'+gemCup(g.color,36,!g.count)+
-      '<b>'+g.name+'</b><span>'+(g.count?'×'+g.count:fmt(g.at/1000)+'K')+'</span></div>').join("")+'</div>'+
+    '<div class="gems">'+t.gems.map(g=>'<button type="button" class="gem'+(g.count?' got':'')+'" data-act="tro" data-v="gem:'+g.at+'" title="'+g.name+': '+fmt(g.at)+' words in one unbroken streak">'+gemCup(g.color,36,!g.count)+
+      '<b>'+g.name+'</b><span>'+(g.count?'×'+g.count:fmt(g.at/1000)+'K')+'</span></button>').join("")+'</div>'+
     '<div class="between"><span class="label">Streaks &amp; milestones</span><span class="muted" style="font-size:12px">current '+t.cur+' · best '+t.best+'</span></div>'+
     '<div class="shelf">'+shelf+
-      '<div class="tro'+(t.drafts?" got":"")+'" role="button" tabindex="0" data-act="tro" data-v="draft">'+CUP.replace('width="24" height="24"','width="20" height="20"')+'<b>Draft done</b><span>'+(t.drafts?'×'+t.drafts:'not yet')+'</span></div>'+
-      '<div class="tro'+(t.revs?" got":"")+'" role="button" tabindex="0" data-act="tro" data-v="rev">'+CUP.replace('width="24" height="24"','width="20" height="20"')+'<b>Revision done</b><span>'+(t.revs?'×'+t.revs:'not yet')+'</span></div>'+
+      '<button type="button" class="tro special'+(t.drafts?" got":"")+'" data-act="tro" data-v="draft">'+draftTrophy(30,!t.drafts)+'<b>Draft done</b><span>'+(t.drafts?'×'+t.drafts:'not yet')+'</span></button>'+
+      '<button type="button" class="tro'+(t.revs?" got":"")+'" data-act="tro" data-v="rev">'+CUP.replace('width="24" height="24"','width="20" height="20"')+'<b>Revision done</b><span>'+(t.revs?'×'+t.revs:'not yet')+'</span></button>'+
     '</div>'+
     '<div class="card" style="display:flex;flex-direction:column;gap:6px;padding:10px 12px"><div class="between" style="font-size:13px"><b>Next: '+(t.cur>=365?"another Year":nx[1])+'</b><span class="mono muted">'+t.cur+' / '+nx[0]+' days</span></div><div class="bar"><span style="width:'+nxPct+'%"></span></div>'+
     '<span class="muted" style="font-size:12px">A missed day resets the streak. Earned trophies stay.</span></div>';
@@ -832,7 +868,7 @@ h2{font-size:17px}
     const a=b.dataset.act, v=b.dataset.v;
     if(a==="go") go(v);
     else if(a==="theme") cycleTheme();
-    else if(a==="tro"){ sheetKind=v; $("sheet").hidden=false; $("sheet").innerHTML=troSheet(v); const c=$("sheet").querySelector(".iconbtn"); if(c) c.focus(); }
+    else if(a==="tro") openTro(v);
     else if(a==="sheet"){ sheetKind="rates"; $("sheet").hidden=false; $("sheet").innerHTML=sheetHTML(); const c=$("sheet").querySelector(".iconbtn"); if(c) c.focus(); }
     else if(a==="closesheet"){ $("sheet").hidden=true; }
     else if(a==="range"){ sheetRange=v; $("sheet").innerHTML=sheetHTML(); }
@@ -861,12 +897,14 @@ h2{font-size:17px}
     else if(a==="cancelcomplete"){ completing=null; render(); }
     else if(a==="finish"||a==="toquery"){
       const p=projOf(v); if(!p) return; const tot=projTotals()[p.id]||0;
+      const wasDraft=(p.stage==="Planning"||p.stage==="Drafting") && !p.draftDoneAt;
       if(p.stage==="Planning"||p.stage==="Drafting"){ p.draftDoneAt=p.draftDoneAt||todayK; p.draftWords=p.draftWords||tot; }
       if(p.stage==="Revising"){ p.revDoneAt=todayK; }
       if(a==="toquery"){ p.stage="Querying"; }
       else { p.stage="Done"; p.completedAt=todayK;
         if(settings.current===p.id){ const nx=settings.projects.find(x=>x.id!==p.id&&x.stage!=="Done"); settings.current=nx?nx.id:""; } }
-      completing=null; saveSettings(a==="toquery"?p.name+" is out querying. Good luck!":"Congratulations on finishing "+p.name+"!");
+      completing=null; saveSettings(wasDraft?"":a==="toquery"?p.name+" is out querying. Good luck!":"Congratulations on finishing "+p.name+"!");
+      if(wasDraft){ go("trophies"); openTro("draft"); }
     }
     else if(a==="setcur"){ settings.current=v; saveSettings("Now writing on "+(settings.projects.find(p=>p.id===v)||{}).name); }
   });
@@ -887,10 +925,12 @@ h2{font-size:17px}
       const vals={cutGoal:parseInt($("rgCut").value,10)||0, chapterGoal:parseInt($("rgCh").value,10)||0, dailyCut:parseInt($("rgDCut").value,10)||0, dailyChapters:parseInt($("rgDCh").value,10)||0};
       if(!vals.dailyCut && !vals.dailyChapters){ toast("Set a daily target: chapters, words cut, or both"); return; }
       const starting=p.stage!=="Revising";
+      const wasDraft=starting && (p.stage==="Planning"||p.stage==="Drafting") && !p.draftDoneAt;
       if(starting){ if(p.stage==="Planning"||p.stage==="Drafting") p.draftDoneAt=p.draftDoneAt||todayK; p.stage="Revising"; }
       p.draftWords=p.draftWords||tot;
       p.revision=Object.assign({startedAt:(p.revision&&p.revision.startedAt)||todayK}, vals);
-      completing=null; saveSettings(starting?p.name+" moved to revision":"Revision goals saved");
+      completing=null; saveSettings(wasDraft?"":starting?p.name+" moved to revision":"Revision goals saved");
+      if(wasDraft){ go("trophies"); openTro("draft"); }
     } else if(f.id==="todayForm"){
       const raw=$("todayWords").value.trim(); if(raw===""){ toast("Enter today's word total"); return; }
       const w=Math.max(0,parseInt(raw,10)||0);
@@ -976,6 +1016,8 @@ h2{font-size:17px}
   // keep data from being cleared, and work offline
   try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch(_){}
   if("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("sw.js").catch(()=>{});
+  // when a new version takes over, reload once so the latest app is on screen (swreload)
+  if("serviceWorker" in navigator && navigator.serviceWorker.controller){ let done=false; navigator.serviceWorker.addEventListener("controllerchange",()=>{ if(done) return; done=true; location.reload(); }); }
 })();
 </script>
 </body>
