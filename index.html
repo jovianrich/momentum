@@ -1,0 +1,664 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Momentum</title>
+<meta name="description" content="Daily writing tracker: word totals, streaks, projects and trophies.">
+<meta name="theme-color" content="#f3f6fa" id="themeColor">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Momentum">
+<meta name="apple-mobile-web-app-status-bar-style" content="default" id="statusBar">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one-screen phone app — scrolling view area over a fixed bottom tab bar; colors switch day/night by the clock */
+:root{
+  --bg:#f3f6fa; --surface:#ffffff; --ink:#0f1720; --muted:#5b6b7d; --line:#dde4ec;
+  --field:#f6f8fb; --fieldline:#cdd6e0; --track:#e6ecf2;
+  --blue:#1083fe; --blue-ink:#0a66d6; --blue-tint:#e3f0ff; --on-blue:#ffffff;
+  --gold:#f5b83d; --gold-ink:#8a5a06; --gold-tint:#fdf3dc;
+  --pink:#ff4f8b; --pink-ink:#b81f5a; --pink-tint:#ffe3ee;
+  --band:#161e27; --band-ink:#f1f3f5; --band-muted:#8b98a9; --band-track:#2c3a4b;
+  --glow:rgba(16,131,254,0.12); --scrim:rgba(15,23,32,0.45);
+  --sans:"Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono:"JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  color-scheme:light;
+}
+:root.night{
+  --bg:#161e27; --surface:#1e2936; --ink:#f1f3f5; --muted:#8b98a9; --line:#2c3a4b;
+  --field:#161e27; --fieldline:#34465b; --track:#253242;
+  --blue:#1083fe; --blue-ink:#4ba3ff; --blue-tint:#1b3350; --on-blue:#ffffff;
+  --gold:#f5b83d; --gold-ink:#f5c463; --gold-tint:#3a3220;
+  --pink:#ff4f8b; --pink-ink:#ff8fb1; --pink-tint:#3e2430;
+  --band:#1e2936; --band-ink:#f1f3f5; --band-muted:#8b98a9; --band-track:#34465b;
+  --glow:rgba(16,131,254,0.16); --scrim:rgba(0,0,0,0.55);
+  color-scheme:dark;
+}
+html,body{height:100%}
+[hidden]{display:none!important}
+body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.45;transition:background-color .6s,color .6s}
+*{box-sizing:border-box}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.app{height:100%;display:flex;flex-direction:column;max-width:460px;margin:0 auto;position:relative;background-image:radial-gradient(circle at 50% 34%,var(--glow),transparent 46%)}
+main{flex:1 1 auto;overflow-y:auto;padding-top:calc(16px + env(safe-area-inset-top,0px));padding-bottom:16px;padding-left:max(18px,env(safe-area-inset-left,0px));padding-right:max(18px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:12px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.label{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px}
+.band{background:var(--band);color:var(--band-ink);border-radius:14px;padding:12px 14px}
+.band .label,.band .sub{color:var(--band-muted)}
+.row{display:flex;align-items:center;gap:8px}
+.between{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.stat{display:flex;flex-direction:column;gap:1px;min-width:0}
+.stat b{font-family:var(--mono);font-weight:600;font-size:17px}
+.stat .sub{font-size:11px}
+.field{height:40px;border:1px solid var(--fieldline);border-radius:9px;background:var(--field);padding:0 10px;min-width:0}
+textarea.field{height:auto;min-height:60px;padding:8px 10px;resize:vertical;width:100%}
+.btn{height:40px;padding:0 16px;border:1px solid var(--fieldline);border-radius:10px;background:var(--surface);font-weight:700;font-size:14px}
+.btn.primary{background:var(--blue);border-color:var(--blue);color:var(--on-blue);font-weight:800}
+.btn.quiet{border-color:transparent;background:none;color:var(--muted)}
+.btn.danger{border-color:transparent;background:none;color:var(--pink-ink)}
+.iconbtn{width:40px;height:40px;border:1px solid var(--line);border-radius:10px;background:var(--surface);display:grid;place-items:center;padding:0;flex:0 0 auto}
+.iconbtn svg{stroke:var(--ink)}
+.bar{height:6px;border-radius:3px;background:var(--track);overflow:hidden}
+.bar>span{display:block;height:100%;background:var(--blue);border-radius:3px}
+h1,h2{margin:0;font-weight:800;text-wrap:balance}
+h1{font-size:23px;line-height:1.15}
+h2{font-size:17px}
+.eyebrow{font-family:var(--mono);font-size:12px;color:var(--muted);letter-spacing:.08em}
+
+/* Today */
+.ringwrap{display:flex;flex-direction:column;align-items:center;gap:4px}
+.ring{position:relative;width:204px;height:204px}
+.ring svg{display:block}
+.ring circle{transition:stroke-dasharray .45s ease}
+.streakbtn{position:absolute;inset:26px;border-radius:50%;border:0;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:0}
+.streakbtn .n{font-family:var(--mono);font-size:58px;font-weight:600;line-height:1}
+.streakbtn .t{font-size:13px;font-weight:700;color:var(--muted)}
+.pill{font-size:11px;font-weight:800;color:var(--blue-ink);background:var(--blue-tint);border-radius:999px;padding:3px 9px}
+.legend{display:flex;flex-wrap:wrap;justify-content:center;gap:12px;font-size:11px;color:var(--muted)}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:-1px}
+.big-input{height:46px;font-family:var(--mono);font-size:22px;font-weight:600;border:1.5px solid var(--blue);width:100%}
+.trophy-link{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:1.5px solid var(--gold);background:var(--gold-tint);border-radius:14px;padding:10px 12px;color:var(--ink)}
+.cup{width:44px;height:44px;flex:0 0 auto;border-radius:12px;background:var(--surface);border:1.5px solid var(--gold);display:grid;place-items:center}
+.cup svg{stroke:var(--gold-ink)}
+.gold-bar{height:6px;border-radius:3px;background:color-mix(in srgb,var(--gold) 28%,transparent);overflow:hidden}
+.gold-bar>span{display:block;height:100%;background:var(--gold)}
+
+/* Calendar */
+.dows,.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
+.dows span{text-align:center;font-size:11px;font-weight:700;color:var(--muted)}
+.day{aspect-ratio:1;max-width:100%;border-radius:9px;border:1px solid var(--line);background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0;font-family:var(--mono);font-size:13px;line-height:1.15;position:relative}
+.day small{font-size:9px;opacity:.85}
+.day .nt{position:absolute;top:4px;right:5px;width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.7}
+.day.part{background:var(--blue-tint);border-color:var(--blue-tint)}
+.day.met{background:var(--blue);border-color:var(--blue);color:#ffffff}
+.day.double{background:var(--gold);border-color:var(--gold);color:#161e27}
+.day.beyond{background:var(--pink);border-color:var(--pink);color:#161e27}
+.day.miss{background:repeating-linear-gradient(135deg,var(--track) 0 5px,transparent 5px 9px);color:var(--muted);border:1px dashed var(--muted)}
+.day.pending{border:1.5px dashed var(--blue)}
+.day.future,.day.before{background:transparent;color:var(--muted);opacity:.6}
+.day.today{box-shadow:0 0 0 2px var(--ink)}
+.day.sel{outline:2.5px solid var(--blue-ink);outline-offset:2px}
+.day.blank{visibility:hidden}
+.sw{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+
+/* Projects */
+.proj{display:flex;flex-direction:column;gap:10px}
+.proj.current{border:1.5px solid var(--blue);box-shadow:0 6px 18px var(--glow)}
+.chip{font-size:11px;font-weight:800;letter-spacing:.06em;color:var(--on-blue);background:var(--blue);border-radius:999px;padding:3px 9px}
+.form{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.form label{display:flex;flex-direction:column;gap:4px;min-width:0}
+.form .full{grid-column:1/-1}
+.add-slot{border:1.5px dashed var(--fieldline);border-radius:14px;background:transparent;padding:16px;font-weight:800;display:flex;flex-direction:column;gap:2px;align-items:center}
+
+/* Trophies */
+.shelf{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.tro{border:1.5px dashed var(--fieldline);border-radius:12px;padding:12px 6px;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;background:var(--surface)}
+.tro svg{stroke:var(--muted)}
+.tro b{font-size:14px}
+.tro span{font-size:11px;color:var(--muted)}
+.tro.got{border-style:solid;border-color:var(--gold);background:var(--gold-tint)}
+.tro.got svg{stroke:var(--gold-ink)}
+.tro.got span{color:var(--gold-ink)}
+
+/* Tabs */
+.tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:var(--surface);border-top:1px solid var(--line);padding:6px max(10px,env(safe-area-inset-right,0px)) calc(8px + env(safe-area-inset-bottom,0px)) max(10px,env(safe-area-inset-left,0px))}
+.tabs button{border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0;font-size:11px;font-weight:700;color:var(--muted)}
+.tabs button svg{stroke:currentColor}
+.tabs button[aria-current="page"]{color:var(--blue-ink)}
+
+/* Sheet + toast */
+.sheet{position:absolute;inset:0;background:var(--scrim);display:flex;flex-direction:column;z-index:10}
+.sheet .away{flex:1 1 auto;border:0;background:transparent}
+.sheet .panel{background:var(--surface);border-radius:22px 22px 0 0;padding:12px 20px calc(28px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:14px}
+.grab{width:40px;height:4px;border-radius:2px;background:var(--fieldline);align-self:center}
+.seg{height:60px;border-radius:12px;border:1px solid var(--line);background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:0}
+.seg[aria-pressed="true"]{border:1.5px solid var(--blue);background:var(--blue-tint)}
+.seg b{font-family:var(--mono);font-size:16px;font-weight:600}
+.seg span{font-size:12px;font-weight:700}
+.tint{border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:2px}
+.tint span{font-size:11px;font-weight:700}
+.tint b{font-family:var(--mono);font-size:18px;font-weight:600}
+.toast{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(76px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;font-weight:700;max-width:calc(100% - 32px);z-index:20;text-align:center}
+.note{font-size:12px;color:var(--muted);text-align:center;margin:0}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+</head>
+<body>
+<div class="app" id="app">
+  <main id="view" aria-live="polite"><p class="note">Loading your ledger…</p></main>
+  <nav class="tabs" id="tabs" aria-label="Sections"></nav>
+  <div class="sheet" id="sheet" hidden></div>
+  <div class="toast" id="toast" hidden></div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const pad = n => String(n).padStart(2,"0");
+  const key = d => d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+  const parse = k => { const [y,m,d]=k.split("-").map(Number); return new Date(y,m-1,d); };
+  const addDays = (d,n) => { const x=new Date(d); x.setDate(x.getDate()+n); return x; };
+  const diff = (a,b) => Math.round((parse(b)-parse(a))/864e5);
+  const fmt = n => Math.round(n).toLocaleString("en-US");
+  const esc = s => String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const MON=["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const DOW=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  const short = k => { const d=parse(k); return MON[d.getMonth()].slice(0,3)+" "+d.getDate(); };
+  const STAGES=["Planning","Drafting","Revising","Editing","Querying","Done"];
+  const CUP='<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M17 5h3v2a3 3 0 0 1-3 3"/><path d="M7 5H4v2a3 3 0 0 0 3 3"/></svg>';
+  const ICON={
+    today:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg>',
+    calendar:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>',
+    projects:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4h9l3 3v13H6z"/><path d="M9 11h6M9 15h6"/></svg>',
+    trophies:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0V4z"/></svg>',
+    sun:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
+    moon:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>',
+    left:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>',
+    right:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>',
+    edit:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z"/></svg>',
+    close:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>'
+  };
+
+  // ---------- state ----------
+  let today=new Date(); today.setHours(0,0,0,0);
+  let todayK=key(today);
+  let days={};            // "YYYY-MM-DD" -> {words, goal, project, note}
+  let settings=defaults();
+  let view="today", calSel=todayK, calY=today.getFullYear(), calM=today.getMonth();
+  let sheetRange="week", editingProj=null, armedDelete=false, pendingRestore=null;
+  let store=null;
+
+  function defaults(){
+    return {goal:500, start:key(new Date()), current:"cn", projects:[
+      {id:"cn", name:"Corporation Nation", target:0, deadline:"", stage:"Drafting"},
+      {id:"ubiz", name:"Unfinished Business", target:0, deadline:"", stage:"Revising"}
+    ]};
+  }
+  function normSettings(s){
+    const o=Object.assign(defaults(), s||{});
+    if(!Array.isArray(o.projects)) o.projects=defaults().projects;
+    o.projects=o.projects.map(p=>({id:String(p.id), name:String(p.name||"Untitled"), target:+p.target||0, deadline:p.deadline||"",
+      stage:STAGES.includes(p.stage)?p.stage:(p.id==="ubiz"?"Revising":"Drafting")}));
+    if(!o.projects.some(p=>p.id===o.current)) o.current=o.projects[0]?o.projects[0].id:"";
+    o.goal=+o.goal>0?+o.goal:500;
+    return o;
+  }
+  function normDay(v){
+    v=v||{};
+    if(Array.isArray(v.items)){ // earlier version: several entries per day
+      let w=0, best={}, p=""; v.items.forEach(i=>{ w+=+i.w||0; best[i.p||""]=(best[i.p||""]||0)+(+i.w||0); });
+      let m=-1; for(const k in best) if(best[k]>m){m=best[k];p=k;}
+      return {words:w, goal:+v.goal||0, project:p, note:v.note||""};
+    }
+    return {words:+v.words||0, goal:+v.goal||0, project:v.project||"", note:v.note||""};
+  }
+
+  // ---------- derived ----------
+  const W = k => days[k] ? days[k].words : 0;
+  const G = k => (days[k] && days[k].goal) || settings.goal;
+  function startKey(){ let s=settings.start||todayK; for(const k in days) if(k<s && days[k].words>0) s=k; return s; }
+  function tierOf(w,g){ if(w>=3*g) return "beyond"; if(w>=2*g) return "double"; if(w>=g) return "met"; if(w>0) return "part"; return "none"; }
+  function status(k){
+    if(k>todayK) return "future";
+    const t=tierOf(W(k),G(k));
+    if(t!=="none") return t;
+    if(k===todayK) return "pending";
+    return k<startKey() ? "before" : "miss";
+  }
+  const met = k => W(k)>=G(k);
+  function streak(){
+    const s=startKey(); let n=0, d=met(todayK)?new Date(today):addDays(today,-1);
+    while(key(d)>=s && met(key(d))){ n++; d=addDays(d,-1); }
+    return n;
+  }
+  function runs(){
+    const s=startKey(), out=[]; let r=0;
+    for(let d=parse(s); key(d)<=todayK; d=addDays(d,1)){
+      const k=key(d);
+      if(met(k)) r++; else { if(k===todayK) break; if(r) out.push(r); r=0; }
+    }
+    if(r) out.push(r);
+    return out;
+  }
+  function rate(range){
+    const s=startKey();
+    let from = range==="year" ? key(new Date(today.getFullYear(),0,1)) : key(addDays(today, range==="week"?-6:-29));
+    if(from<s) from=s;
+    let days_=0,m=0,dbl=0,bey=0;
+    for(let d=parse(from); key(d)<=todayK; d=addDays(d,1)){
+      const k=key(d), w=W(k), g=G(k);
+      if(k===todayK && w<g) continue;
+      days_++; if(w>=g)m++; if(w>=2*g)dbl++; if(w>=3*g)bey++;
+    }
+    return {days:days_, met:m, dbl, bey, pct: days_?Math.round(100*m/days_):null, from, to: met(todayK)?todayK:key(addDays(today,-1))};
+  }
+  function yearStats(){
+    const y=String(today.getFullYear()); let w=0,written=0,hit=0;
+    for(const k in days) if(k.startsWith(y)){ const x=days[k]; w+=x.words; if(x.words>0) written++; if(x.words>=G(k)) hit++; }
+    return {w,written,hit};
+  }
+  function totalWords(){ let t=0; for(const k in days) t+=days[k].words; return t; }
+  function projTotals(year){
+    const t={}; for(const k in days){ if(year && !k.startsWith(year)) continue; const p=days[k].project||""; t[p]=(t[p]||0)+days[k].words; } return t;
+  }
+  function projPace(pid){
+    let first=null; for(const k in days) if(days[k].project===pid && days[k].words>0 && (!first||k<first)) first=k;
+    if(!first) return 0;
+    let from=key(addDays(today,-13)); if(from<first) from=first;
+    let sum=0; for(let d=parse(from); key(d)<=todayK; d=addDays(d,1)){ const x=days[key(d)]; if(x && x.project===pid) sum+=x.words; }
+    return sum/(diff(from,todayK)+1);
+  }
+  const STREAK_TROPHIES=[[7,"Week"],[30,"Month"],[60,"2 months"],[90,"3 months"],[180,"6 months"],[365,"Year"]];
+  function trophies(){
+    const total=totalWords(), rs=runs(), cur=streak();
+    const wordCount=Math.floor(total/5000);
+    const streaks=STREAK_TROPHIES.map(([n,name])=>({n,name,count:rs.filter(r=>r>=n).length}));
+    const best=rs.length?Math.max(...rs):0;
+    const next=STREAK_TROPHIES.find(([n])=>n>cur) || STREAK_TROPHIES[STREAK_TROPHIES.length-1];
+    return {total, wordCount, nextWords:(wordCount+1)*5000, streaks, best, cur, next,
+      earned: wordCount + streaks.reduce((s,x)=>s+x.count,0)};
+  }
+  const earnedKeys = () => { const t=trophies(); return ["w"+t.wordCount].concat(t.streaks.map(s=>s.n+":"+s.count)); };
+
+  // ---------- theme by time of day ----------
+  function themePref(){ try{ return localStorage.getItem("dwl-theme")||"auto"; }catch(_){ return "auto"; } }
+  function isNight(){
+    const p=themePref(); if(p==="night") return true; if(p==="day") return false;
+    const h=new Date().getHours(); return h<6 || h>=19;
+  }
+  function applyTheme(){ const n=isNight(); document.documentElement.classList.toggle("night", n); const m=$("themeColor"); if(m) m.setAttribute("content", n?"#161e27":"#f3f6fa"); }
+  function cycleTheme(){
+    const order=["auto","day","night"], p=themePref(), nx=order[(order.indexOf(p)+1)%3];
+    try{ localStorage.setItem("dwl-theme",nx); }catch(_){}
+    applyTheme(); render();
+    toast(nx==="auto" ? "Colors follow the time of day" : nx==="day" ? "Day colors, all the time" : "Night colors, all the time");
+  }
+
+  // ---------- views ----------
+  function ringSVG(w,g){
+    const C=2*Math.PI*88, lap=n=>Math.min(1,Math.max(0,(w-n*g)/g));
+    const arc=(f,color)=> f>0 ? '<circle cx="102" cy="102" r="88" fill="none" stroke="'+color+'" stroke-width="18" stroke-linecap="round" stroke-dasharray="'+(f*C).toFixed(1)+' '+C.toFixed(1)+'" transform="rotate(-90 102 102)"/>' : "";
+    return '<svg width="204" height="204" viewBox="0 0 204 204" aria-hidden="true"><circle cx="102" cy="102" r="88" fill="none" stroke="var(--track)" stroke-width="18"/>'+
+      arc(lap(0),"var(--blue)")+arc(lap(1),"var(--gold)")+arc(lap(2),"var(--pink)")+'</svg>';
+  }
+  function tierLine(w,g){
+    const t=tierOf(w,g);
+    const txt={none:fmt(g)+" to go", part:fmt(g-w)+" to go", met:"Target met", double:"Double target!", beyond:(w/g).toFixed(1)+"× target!"}[t];
+    const col={none:"var(--muted)",part:"var(--muted)",met:"var(--blue-ink)",double:"var(--gold-ink)",beyond:"var(--pink-ink)"}[t];
+    return fmt(w)+' of '+fmt(g)+' words today · <span style="color:'+col+'">'+txt+'</span>';
+  }
+  function projOptions(sel){
+    return '<option value="">No project</option>'+settings.projects.map(p=>'<option value="'+esc(p.id)+'"'+(p.id===sel?" selected":"")+'>'+esc(p.name)+'</option>').join("");
+  }
+
+  function viewToday(){
+    const w=W(todayK), g=G(todayK), st=streak(), ys=yearStats(), tr=trophies();
+    const cur=settings.projects.find(p=>p.id===settings.current), pt=projTotals();
+    let projLine="";
+    if(cur){
+      const tot=pt[cur.id]||0;
+      projLine = cur.target>0
+        ? '<div class="row"><div class="bar" style="flex:1"><span style="width:'+Math.min(100,100*tot/cur.target)+'%"></span></div><span class="mono muted" style="font-size:11px">'+fmt(tot)+' / '+fmt(cur.target)+'</span></div>'
+        : '<div class="between"><span class="mono muted" style="font-size:11px">'+fmt(tot)+' words logged</span><button class="btn quiet" style="height:28px;padding:0;font-size:12px" data-act="go" data-v="projects">Set a target</button></div>';
+    }
+    const now=new Date(), night=isNight();
+    return ''+
+    '<div class="between">'+
+      '<div><div class="eyebrow">'+DOW[now.getDay()].slice(0,3).toUpperCase()+' · '+MON[now.getMonth()].slice(0,3).toUpperCase()+' '+now.getDate()+'</div><h1>Momentum</h1></div>'+
+      '<button class="iconbtn" data-act="theme" aria-label="Color mode: '+(themePref()==="auto"?"follows time of day":themePref())+'. Tap to change." title="'+(themePref()==="auto"?"Auto: day 6am–7pm, night after":"Fixed "+themePref()+" colors")+'">'+(night?ICON.moon:ICON.sun)+'</button>'+
+    '</div>'+
+    '<div class="card" style="display:flex;flex-direction:column;gap:8px">'+
+      '<div class="row"><label class="label" for="curProj" style="flex:0 0 auto">Writing on</label>'+
+      '<select id="curProj" class="field" style="flex:1;font-weight:800;font-size:15px">'+projOptions(settings.current)+'</select></div>'+
+      projLine+
+    '</div>'+
+    '<div class="ringwrap">'+
+      '<div class="ring"><div id="ringArt">'+ringSVG(w,g)+'</div>'+
+        '<button class="streakbtn" data-act="sheet" aria-label="'+st+'-day streak. Show on-target rates"><span class="n mono">'+st+'</span><span class="t">day streak</span><span class="pill" style="margin-top:4px">On-target rates ›</span></button>'+
+      '</div>'+
+      '<span id="tierLine" style="font-size:14px;font-weight:800;text-align:center">'+tierLine(w,g)+'</span>'+
+      '<div class="legend"><span><i style="background:var(--blue)"></i>Target</span><span><i style="background:var(--gold)"></i>Double</span><span><i style="background:var(--pink)"></i>More than double</span></div>'+
+    '</div>'+
+    '<form class="card" id="todayForm" style="display:flex;flex-direction:column;gap:10px">'+
+      '<div class="row" style="align-items:flex-end">'+
+        '<label for="todayWords" style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px"><span class="label">Today\'s word total</span>'+
+        '<input id="todayWords" class="field big-input" type="number" inputmode="numeric" min="0" placeholder="0" value="'+(days[todayK]?w:"")+'"></label>'+
+        '<button class="btn primary" type="submit" style="height:46px;padding:0 20px">Save</button>'+
+      '</div>'+
+      '<div class="between"><label for="goalIn" class="muted" style="font-size:13px">My daily target</label>'+
+        '<div class="row"><input id="goalIn" class="field mono" type="number" inputmode="numeric" min="50" step="50" value="'+settings.goal+'" style="width:84px;height:34px;text-align:right"><span class="muted" style="font-size:13px">words</span></div></div>'+
+    '</form>'+
+    '<div class="band grid3">'+
+      '<div class="stat"><span class="label">'+today.getFullYear()+' words</span><b style="font-size:20px">'+fmt(ys.w)+'</b></div>'+
+      '<div class="stat"><span class="sub">days written</span><b>'+ys.written+'</b></div>'+
+      '<div class="stat"><span class="sub">targets met</span><b>'+ys.hit+'</b></div>'+
+    '</div>'+
+    '<button class="trophy-link" data-act="go" data-v="trophies"><span class="cup">'+CUP+'</span>'+
+      '<span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px"><b style="font-size:14px">Next trophy: '+fmt(tr.nextWords)+' words</b>'+
+      '<span class="gold-bar"><span style="width:'+(100*(tr.total%5000)/5000)+'%"></span></span>'+
+      '<span class="mono" style="font-size:11px;color:var(--gold-ink)">'+fmt(tr.nextWords-tr.total)+' to go</span></span>'+
+      '<span style="color:var(--gold-ink)">'+ICON.right.replace('stroke-width','stroke="currentColor" stroke-width')+'</span></button>';
+  }
+
+  function viewCalendar(){
+    const first=new Date(calY,calM,1), dim=new Date(calY,calM+1,0).getDate();
+    let cells="", mw=0, mt=0, mm=0, md=0;
+    for(let i=0;i<first.getDay();i++) cells+='<span class="day blank"></span>';
+    for(let n=1;n<=dim;n++){
+      const k=key(new Date(calY,calM,n)), st=status(k), w=W(k), note=days[k]&&days[k].note;
+      mw+=w; if(st==="met"||st==="double"||st==="beyond"){mm++;} if(st==="double"||st==="beyond")md++;
+      if(["met","double","beyond","part","miss"].includes(st)) mt++;
+      const sw = w ? (w>=1000?(w/1000).toFixed(1).replace(/\.0$/,"")+"k":w) : "";
+      cells+='<button class="day '+st+(k===todayK?" today":"")+(k===calSel?" sel":"")+'" data-act="pick" data-v="'+k+'"'+(st==="future"?" disabled":"")+
+        ' aria-label="'+MON[calM]+' '+n+(w?", "+fmt(w)+" words":"")+'"><span>'+n+'</span><small>'+sw+'</small>'+(note?'<span class="nt"></span>':'')+'</button>';
+    }
+    const isNow=calY===today.getFullYear()&&calM===today.getMonth();
+    const sd=parse(calSel), sw_=W(calSel), sg=G(calSel), sst=status(calSel), d=days[calSel];
+    const stName={met:"Target met",double:"Double target",beyond:"More than double",part:fmt(sg-sw_)+" short",miss:"Missed",pending:"Not logged yet",before:"Before you started"}[sst]||"";
+    const stCol={met:"var(--blue-ink)",double:"var(--gold-ink)",beyond:"var(--pink-ink)"}[sst]||"var(--muted)";
+    return ''+
+    '<div class="between"><div><div class="eyebrow">CALENDAR</div><h1>'+MON[calM]+' '+calY+'</h1></div>'+
+      '<div class="row"><button class="iconbtn" data-act="month" data-v="-1" aria-label="Previous month">'+ICON.left+'</button>'+
+      '<button class="iconbtn" data-act="month" data-v="1" aria-label="Next month"'+(isNow?' disabled style="opacity:.4"':'')+'>'+ICON.right+'</button></div></div>'+
+    '<div class="card" style="display:flex;flex-direction:column;gap:6px"><div class="dows"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div><div class="cal">'+cells+'</div></div>'+
+    '<div class="legend" style="justify-content:flex-start"><span><i class="sw" style="background:var(--blue-tint);border-radius:3px"></i>Some words</span><span><i class="sw" style="background:var(--blue)"></i>Target</span><span><i class="sw" style="background:var(--gold)"></i>Double</span><span><i class="sw" style="background:var(--pink)"></i>More than double</span><span><i class="sw" style="border:1px dashed var(--muted)"></i>Missed</span></div>'+
+    '<div class="band grid3"><div class="stat"><span class="label">This month</span><b style="font-size:19px">'+fmt(mw)+'</b></div>'+
+      '<div class="stat"><span class="sub">targets met</span><b>'+mm+' of '+mt+'</b></div><div class="stat"><span class="sub">doubled+</span><b>'+md+'</b></div></div>'+
+    '<form class="card" id="dayForm" style="display:flex;flex-direction:column;gap:10px">'+
+      '<div class="between"><h2>'+DOW[sd.getDay()]+', '+short(calSel)+'</h2><span style="font-size:12px;font-weight:800;color:'+stCol+'">'+stName+'</span></div>'+
+      '<div class="row" style="align-items:flex-end"><label for="dayWords" style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px"><span class="label">Word total for this day</span>'+
+        '<input id="dayWords" class="field big-input" style="height:42px;font-size:19px" type="number" inputmode="numeric" min="0" placeholder="0" value="'+(d?sw_:"")+'"></label>'+
+        '<button class="btn primary" type="submit" style="height:42px">Save</button></div>'+
+      '<div class="row"><label for="dayProj" class="label" style="flex:0 0 auto">Project</label><select id="dayProj" class="field" style="flex:1">'+projOptions(d?d.project:settings.current)+'</select></div>'+
+      '<textarea id="dayNote" class="field" placeholder="Note for this day: what you worked on, how it went">'+esc(d?d.note:"")+'</textarea>'+
+      (d?'<button class="btn danger" type="button" data-act="clearday" style="align-self:flex-start;height:30px;padding:0">Clear this day</button>':'<span class="note" style="text-align:left">Tap any past day to fill in or fix its total.</span>')+
+    '</form>';
+  }
+
+  function viewProjects(){
+    const pt=projTotals(), yt=projTotals(String(today.getFullYear()));
+    const list=settings.projects.slice().sort((a,b)=>(b.id===settings.current)-(a.id===settings.current));
+    let cards=list.map(p=>{
+      if(editingProj===p.id) return projForm(p);
+      const tot=pt[p.id]||0, pace=projPace(p.id), cur=p.id===settings.current;
+      let status="";
+      if(p.target>0){
+        const left=p.target-tot;
+        if(left<=0) status='<span style="font-size:12px;font-weight:800;color:var(--blue-ink)">Target reached</span>';
+        else if(p.deadline && p.deadline>=todayK){
+          const need=left/(diff(todayK,p.deadline)+1);
+          const ok=pace>=need;
+          status='<span style="font-size:12px;font-weight:800;color:'+(ok?"var(--blue-ink)":"var(--pink-ink)")+'">'+(ok?"On track for "+short(p.deadline):"Needs "+fmt(need)+"/day to make "+short(p.deadline))+'</span>';
+        } else if(p.deadline) status='<span style="font-size:12px;font-weight:800;color:var(--pink-ink)">Deadline '+short(p.deadline)+' has passed</span>';
+      }
+      let finish="–";
+      if(p.target>0 && pace>0 && tot<p.target){ const f=addDays(today,Math.ceil((p.target-tot)/pace)); finish=short(key(f))+(f.getFullYear()!==today.getFullYear()?" "+String(f.getFullYear()).slice(2):""); }
+      else if(p.target>0 && tot>=p.target) finish="Done";
+      return '<div class="card proj'+(cur?" current":"")+'">'+
+        '<div class="between">'+(cur?'<span class="chip">WRITING ON</span>':'<span></span>')+'<span class="muted" style="font-size:12px">'+esc(p.stage)+'</span></div>'+
+        '<div class="between" style="align-items:flex-start"><h2 style="font-size:'+(cur?20:17)+'px">'+esc(p.name)+'</h2><button class="iconbtn" style="width:36px;height:36px" data-act="editproj" data-v="'+esc(p.id)+'" aria-label="Edit '+esc(p.name)+'">'+ICON.edit+'</button></div>'+
+        '<div class="row" style="align-items:baseline"><b class="mono" style="font-size:'+(cur?28:20)+'px;font-weight:600;line-height:1">'+fmt(tot)+'</b><span class="mono muted" style="font-size:13px">'+(p.target>0?"/ "+fmt(p.target)+" · "+Math.floor(100*tot/p.target)+"%":"words · no target set")+'</span></div>'+
+        (p.target>0?'<div class="bar" style="height:8px"><span style="width:'+Math.min(100,100*tot/p.target)+'%"></span></div>':'')+
+        (p.target>0?'<div class="grid3"><div class="stat"><span class="sub muted">pace</span><b style="font-size:14px">'+(pace?fmt(pace)+"/day":"–")+'</b></div><div class="stat"><span class="sub muted">done around</span><b style="font-size:14px">'+finish+'</b></div><div class="stat"><span class="sub muted">deadline</span><b style="font-size:14px">'+(p.deadline?short(p.deadline):"–")+'</b></div></div>':'')+
+        status+
+        (!cur?'<button class="btn" data-act="setcur" data-v="'+esc(p.id)+'">Write on this</button>':'')+
+      '</div>';
+    }).join("");
+    if(editingProj==="new") cards=projForm(null)+cards;
+    const yw=Object.values(yt).reduce((a,b)=>a+b,0);
+    const colors=["var(--blue)","var(--gold)","var(--pink)","#7c8cff","#3fc7ac","#b38cff"];
+    let seg="", leg="";
+    settings.projects.forEach((p,i)=>{ const v=yt[p.id]||0; if(!v) return; const c=colors[i%colors.length]; seg+='<span style="flex:'+v+' 1 0;background:'+c+'"></span>'; leg+='<span><i class="sw" style="background:'+c+'"></i>'+esc(p.name)+'</span>'; });
+    const other=Object.keys(yt).filter(k=>!settings.projects.some(p=>p.id===k)).reduce((s,k)=>s+yt[k],0);
+    if(other){ seg+='<span style="flex:'+other+' 1 0;background:var(--band-track)"></span>'; leg+='<span><i class="sw" style="background:var(--band-track)"></i>No project</span>'; }
+    return ''+
+    '<div class="between"><div><div class="eyebrow">PROJECTS</div><h1>Your manuscripts</h1></div>'+
+      '<button class="btn primary" data-act="newproj" style="padding:0 14px">+ New</button></div>'+
+    (cards || '<button class="add-slot" data-act="newproj"><span>Add your first project</span><span class="muted" style="font-size:12px;font-weight:500">A title, a word target and an optional deadline</span></button>')+
+    (yw?'<div class="band" style="display:flex;flex-direction:column;gap:8px"><span class="label">'+today.getFullYear()+' words by project</span><div style="display:flex;height:10px;border-radius:5px;overflow:hidden;gap:2px">'+seg+'</div><div class="legend" style="justify-content:flex-start;color:var(--band-muted)">'+leg+'</div></div>':'')+
+    backupCard();
+  }
+  function backupCard(){
+    const last=(()=>{ try{ return localStorage.getItem("dwl-last-backup"); }catch(_){ return null; } })();
+    if(pendingRestore){
+      const n=Object.keys(pendingRestore.days||{}).length;
+      return '<div class="card" style="display:flex;flex-direction:column;gap:10px;border:1.5px solid var(--pink)"><h2>Restore this backup?</h2>'+
+        '<p class="muted" style="margin:0;font-size:13px">It has '+n+' logged day'+(n===1?"":"s")+(pendingRestore.exported?', saved '+short(pendingRestore.exported.slice(0,10)):"")+'. It replaces everything currently in Momentum on this device.</p>'+
+        '<div class="row"><button class="btn primary" data-act="confirmrestore">Restore</button><button class="btn quiet" data-act="cancelrestore">Cancel</button></div></div>';
+    }
+    return '<div class="card" style="display:flex;flex-direction:column;gap:10px"><div class="between"><h2>Backup</h2><span class="muted" style="font-size:12px">'+(last?"Last saved "+short(last):"Not backed up yet")+'</span></div>'+
+      '<p class="muted" style="margin:0;font-size:13px">Your ledger lives on this device. Save a backup file now and then, and use it to move to a new phone.</p>'+
+      '<div class="row" style="flex-wrap:wrap"><button class="btn" data-act="backup">Save a backup</button>'+
+      '<label class="btn quiet" style="display:inline-flex;align-items:center;cursor:pointer">Restore from file<input id="restoreFile" type="file" accept="application/json,.json" hidden></label></div></div>';
+  }
+  function projForm(p){
+    p=p||{name:"",target:"",deadline:"",stage:"Drafting"};
+    return '<form class="card form" id="projForm" style="border:1.5px solid var(--blue)">'+
+      '<label class="full"><span class="label">Title</span><input id="pfName" class="field" required maxlength="80" value="'+esc(p.name)+'" placeholder="Novel title"></label>'+
+      '<label><span class="label">Stage</span><select id="pfStage" class="field">'+STAGES.map(s=>'<option'+(s===p.stage?" selected":"")+'>'+s+'</option>').join("")+'</select></label>'+
+      '<label><span class="label">Target words</span><input id="pfTarget" class="field mono" type="number" min="0" step="1000" inputmode="numeric" placeholder="80000" value="'+(p.target||"")+'"></label>'+
+      '<label class="full"><span class="label">Deadline (optional)</span><input id="pfDue" class="field" type="date" value="'+esc(p.deadline||"")+'"></label>'+
+      '<div class="full row" style="flex-wrap:wrap"><button class="btn primary" type="submit">'+(p.id?"Save":"Add project")+'</button><button class="btn quiet" type="button" data-act="cancelproj">Cancel</button>'+
+      (p.id?'<button class="btn danger" type="button" data-act="delproj" data-v="'+esc(p.id)+'" style="margin-left:auto">'+(armedDelete?"Tap again to delete":"Delete")+'</button>':'')+'</div>'+
+      (p.id&&armedDelete?'<p class="note full" style="text-align:left">Days logged to it stay in your totals as "No project".</p>':'')+
+    '</form>';
+  }
+
+  function viewTrophies(){
+    const t=trophies(), into=t.total%5000, inRun=t.wordCount%10;
+    let ticks=""; for(let i=0;i<10;i++) ticks+='<span style="height:8px;border-radius:2px;background:'+(i<inRun?"var(--gold)":"var(--band-track)")+'"></span>';
+    const shelf=t.streaks.map(s=>'<div class="tro'+(s.count?" got":"")+'">'+CUP.replace('width="24" height="24"','width="26" height="26"')+'<b>'+s.name+'</b><span>'+s.n+' days'+(s.count?' · ×'+s.count:'')+'</span></div>').join("");
+    const nx=t.next, nxPct=Math.min(100,100*t.cur/nx[0]);
+    return ''+
+    '<div><div class="eyebrow">TROPHIES</div><h1>Trophy shelf</h1><span class="muted" style="font-size:13px">'+t.earned+' earned so far</span></div>'+
+    '<div class="band" style="display:flex;flex-direction:column;gap:12px;padding:16px">'+
+      '<span class="label">Every 5,000 words</span>'+
+      '<div class="row" style="gap:14px"><span style="width:64px;height:64px;border-radius:16px;background:var(--gold);display:grid;place-items:center">'+CUP.replace('width="24" height="24"','width="34" height="34" stroke="#161e27"')+'</span>'+
+        '<div class="stat"><b style="font-size:34px;line-height:1">×'+t.wordCount+'</b><span class="sub" style="font-size:13px">'+fmt(t.total)+' words all time</span></div></div>'+
+      '<div class="between" style="font-size:12px"><span>Next: '+fmt(t.nextWords)+'</span><span class="mono sub">'+fmt(t.nextWords-t.total)+' to go</span></div>'+
+      '<div class="gold-bar" style="height:8px;background:var(--band-track)"><span style="width:'+(100*into/5000)+'%"></span></div>'+
+      '<div style="display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:4px">'+ticks+'</div>'+
+      '<span class="sub" style="font-size:12px">'+inRun+' of 10 toward '+fmt((Math.floor(t.wordCount/10)+1)*50000)+' words</span>'+
+    '</div>'+
+    '<div class="between"><span class="label">Streaks</span><span class="muted" style="font-size:12px">current '+t.cur+' · best '+t.best+'</span></div>'+
+    '<div class="shelf">'+shelf+'</div>'+
+    '<div class="card" style="display:flex;flex-direction:column;gap:6px"><div class="between" style="font-size:13px"><b>Next: '+(t.cur>=365?"another Year":nx[1])+'</b><span class="mono muted">'+t.cur+' / '+nx[0]+' days</span></div><div class="bar"><span style="width:'+nxPct+'%"></span></div>'+
+    '<span class="muted" style="font-size:12px">A missed day resets the streak. Trophies you\'ve earned stay on the shelf.</span></div>';
+  }
+
+  function sheetHTML(){
+    const R={week:["Past week",rate("week")],month:["Past 30 days",rate("month")],year:[today.getFullYear()+" so far",rate("year")]};
+    const s=R[sheetRange][1];
+    const segs=Object.keys(R).map(k=>'<button class="seg" data-act="range" data-v="'+k+'" aria-pressed="'+(k===sheetRange)+'"><span>'+R[k][0]+'</span><b>'+(R[k][1].pct==null?"–":R[k][1].pct+"%")+'</b></button>').join("");
+    return '<button class="away" data-act="closesheet" aria-label="Close"></button>'+
+    '<div class="panel" role="dialog" aria-label="On-target rates">'+
+      '<span class="grab"></span>'+
+      '<div class="between"><div><h2 style="font-size:20px">On target</h2><span class="muted" style="font-size:13px">Days you wrote '+fmt(settings.goal)+'+ words</span></div><button class="iconbtn" data-act="closesheet" aria-label="Close">'+ICON.close+'</button></div>'+
+      '<div class="grid3">'+segs+'</div>'+
+      (s.days ?
+        '<div class="between" style="align-items:flex-end"><b class="mono" style="font-size:60px;font-weight:600;line-height:.95;color:var(--blue-ink)">'+s.pct+'%</b><span class="muted" style="font-size:14px;text-align:right">'+s.met+' of '+s.days+' days<br>'+short(s.from)+' – '+short(s.to)+'</span></div>'+
+        '<div class="bar" style="height:10px"><span style="width:'+s.pct+'%"></span></div>'+
+        '<div class="grid3"><div class="tint" style="background:var(--blue-tint)"><span style="color:var(--blue-ink)">Target met</span><b>'+s.met+'</b></div>'+
+        '<div class="tint" style="background:var(--gold-tint)"><span style="color:var(--gold-ink)">Doubled</span><b>'+s.dbl+'</b></div>'+
+        '<div class="tint" style="background:var(--pink-tint)"><span style="color:var(--pink-ink)">More than double</span><b>'+s.bey+'</b></div></div>'
+      : '<p class="muted" style="margin:0">No finished days in this range yet. Log today to start the count.</p>')+
+      '<span class="muted" style="font-size:13px">Current streak '+streak()+' days · Best '+trophies().best+' days</span>'+
+    '</div>';
+  }
+
+  // ---------- render + routing ----------
+  const TABS=[["today","Today"],["calendar","Calendar"],["projects","Projects"],["trophies","Trophies"]];
+  function render(){
+    const scroll=$("view").scrollTop, same=$("view").dataset.v===view;
+    $("view").innerHTML = view==="calendar"?viewCalendar():view==="projects"?viewProjects():view==="trophies"?viewTrophies():viewToday();
+    $("view").dataset.v=view; if(same) $("view").scrollTop=scroll;
+    $("tabs").innerHTML=TABS.map(([v,l])=>'<button data-act="go" data-v="'+v+'"'+(v===view?' aria-current="page"':'')+'>'+ICON[v]+l+'</button>').join("");
+    if(!$("sheet").hidden) $("sheet").innerHTML=sheetHTML();
+  }
+  function go(v){ if(!TABS.some(t=>t[0]===v)) v="today"; view=v; editingProj=null; armedDelete=false; $("sheet").hidden=true; try{ if(location.hash!=="#"+v) history.replaceState(null,"","#"+v); }catch(_){ } render(); $("view").scrollTop=0; }
+  window.addEventListener("hashchange",()=>{ const v=location.hash.slice(1); if(v&&v!==view) go(v); });
+
+  let tt; function toast(t){ const el=$("toast"); el.textContent=t; el.hidden=false; clearTimeout(tt); tt=setTimeout(()=>el.hidden=true,3500); }
+
+  // ---------- actions ----------
+  async function saveDay(k, patch, msg){
+    const before=earnedKeys().join("|"), prevBest=trophies();
+    const d=Object.assign({words:0, goal:G(k), project:settings.current, note:""}, days[k]||{}, patch);
+    if(!days[k]) d.goal=settings.goal;
+    days[k]=d; render();
+    try{ await store.saveDay(k,d); }catch(e){ toast("Couldn't save. Check your connection and try again."); return; }
+    const after=trophies();
+    if(after.wordCount>prevBest.wordCount) toast("Trophy! You passed "+fmt(after.wordCount*5000)+" words");
+    else { const s=after.streaks.find((x,i)=>x.count>prevBest.streaks[i].count); if(s) toast("Trophy! "+s.name+" streak: "+s.n+" days in a row"); else if(msg) toast(msg); }
+  }
+  async function clearDay(k){ delete days[k]; render(); try{ await store.clearDay(k); toast("Day cleared"); }catch(_){ toast("Couldn't clear that day. Try again."); } }
+  async function saveSettings(msg){ render(); try{ await store.saveSettings(settings); if(msg) toast(msg); }catch(_){ toast("Couldn't save that change. Try again."); } }
+
+  document.addEventListener("click", e=>{
+    const b=e.target.closest("[data-act]"); if(!b) return;
+    const a=b.dataset.act, v=b.dataset.v;
+    if(a==="go") go(v);
+    else if(a==="theme") cycleTheme();
+    else if(a==="sheet"){ $("sheet").hidden=false; $("sheet").innerHTML=sheetHTML(); const c=$("sheet").querySelector(".iconbtn"); if(c) c.focus(); }
+    else if(a==="closesheet"){ $("sheet").hidden=true; }
+    else if(a==="range"){ sheetRange=v; $("sheet").innerHTML=sheetHTML(); }
+    else if(a==="pick"){ calSel=v; render(); }
+    else if(a==="month"){ calM+=+v; if(calM<0){calM=11;calY--;} if(calM>11){calM=0;calY++;} render(); }
+    else if(a==="clearday") clearDay(calSel);
+    else if(a==="newproj"){ editingProj="new"; armedDelete=false; render(); const f=$("pfName"); if(f) f.focus(); }
+    else if(a==="editproj"){ editingProj=v; armedDelete=false; render(); }
+    else if(a==="cancelproj"){ editingProj=null; armedDelete=false; render(); }
+    else if(a==="delproj"){
+      if(!armedDelete){ armedDelete=true; render(); return; }
+      settings.projects=settings.projects.filter(p=>p.id!==v);
+      if(settings.current===v) settings.current=settings.projects[0]?settings.projects[0].id:"";
+      editingProj=null; armedDelete=false; saveSettings("Project deleted");
+    }
+    else if(a==="backup") backup();
+    else if(a==="confirmrestore"){
+      days={}; const src=pendingRestore.days||{}; for(const k in src) if(/^\d{4}-\d{2}-\d{2}$/.test(k)) days[k]=normDay(src[k]);
+      settings=normSettings(pendingRestore.settings); pendingRestore=null; local.persist(); render(); toast("Backup restored");
+    }
+    else if(a==="cancelrestore"){ pendingRestore=null; render(); }
+    else if(a==="setcur"){ settings.current=v; saveSettings("Now writing on "+(settings.projects.find(p=>p.id===v)||{}).name); }
+  });
+  document.addEventListener("keydown", e=>{ if(e.key==="Escape" && !$("sheet").hidden) $("sheet").hidden=true; });
+
+  document.addEventListener("submit", e=>{
+    e.preventDefault();
+    const f=e.target;
+    if(f.id==="todayForm"){
+      const raw=$("todayWords").value.trim(); if(raw===""){ toast("Enter today's word total"); return; }
+      const w=Math.max(0,parseInt(raw,10)||0);
+      saveDay(todayK,{words:w, project:days[todayK]&&days[todayK].project!==undefined&&days[todayK].words>0?days[todayK].project:settings.current},
+        w>=3*settings.goal?"Saved. More than double!":w>=2*settings.goal?"Saved. Double target!":w>=settings.goal?"Saved. Target met!":"Saved. "+fmt(settings.goal-w)+" to go");
+    } else if(f.id==="dayForm"){
+      const raw=$("dayWords").value.trim(); const w=raw===""?0:Math.max(0,parseInt(raw,10)||0);
+      saveDay(calSel,{words:w, project:$("dayProj").value, note:$("dayNote").value},"Saved "+short(calSel));
+    } else if(f.id==="projForm"){
+      const name=$("pfName").value.trim(); if(!name) return;
+      const vals={name, stage:$("pfStage").value, target:parseInt($("pfTarget").value,10)||0, deadline:$("pfDue").value||""};
+      if(editingProj==="new"){ const id="p"+Date.now().toString(36); settings.projects.push(Object.assign({id},vals)); if(!settings.current) settings.current=id; }
+      else Object.assign(settings.projects.find(p=>p.id===editingProj),vals);
+      const wasNew=editingProj==="new"; editingProj=null; saveSettings(wasNew?"Project added":"Project saved");
+    }
+  });
+
+  let gt;
+  document.addEventListener("input", e=>{
+    const t=e.target;
+    if(t.id==="todayWords"){ // live preview of the ring before saving
+      const w=Math.max(0,parseInt(t.value,10)||0), g=G(todayK);
+      $("ringArt").innerHTML=ringSVG(w,g); $("tierLine").innerHTML=tierLine(w,g);
+    } else if(t.id==="goalIn"){
+      clearTimeout(gt); gt=setTimeout(()=>{ const g=parseInt(t.value,10); if(!(g>0)||g===settings.goal) return;
+        settings.goal=g; if(days[todayK]){ days[todayK].goal=g; store.saveDay(todayK,days[todayK]).catch(()=>{}); }
+        saveSettings("Daily target: "+fmt(g)+" words"); },800);
+    }
+  });
+  async function backup(){
+    const data={app:"momentum", version:1, exported:new Date().toISOString(), days, settings};
+    const name="momentum-backup-"+todayK+".json";
+    const file=new File([JSON.stringify(data,null,1)], name, {type:"application/json"});
+    const done=()=>{ try{ localStorage.setItem("dwl-last-backup",todayK); }catch(_){} render(); };
+    try{
+      if(navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({files:[file], title:"Momentum backup"}); done(); toast("Backup saved"); return; }
+    }catch(err){ if(err && err.name==="AbortError") return; }
+    const url=URL.createObjectURL(file), a=document.createElement("a");
+    a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),5000); done(); toast("Backup downloaded");
+  }
+  document.addEventListener("change", e=>{
+    const t=e.target;
+    if(t.id==="restoreFile" && t.files && t.files[0]){
+      const r=new FileReader();
+      r.onload=()=>{ try{ const d=JSON.parse(r.result); if(!d || typeof d.days!=="object") throw 0; pendingRestore=d; render(); }
+        catch(_){ toast("That file isn't a Momentum backup"); } };
+      r.readAsText(t.files[0]); t.value=""; return;
+    }
+    if(t.id==="curProj"){ settings.current=t.value; if(days[todayK]){ days[todayK].project=t.value; store.saveDay(todayK,days[todayK]).catch(()=>{}); } saveSettings(); }
+  });
+  document.addEventListener("focusout", e=>{
+    const t=e.target;
+    if(t.id==="dayNote"){ const cur=(days[calSel]&&days[calSel].note)||""; if(t.value!==cur) saveDay(calSel,{note:t.value},"Note saved"); }
+  });
+
+  // clock: theme + midnight rollover
+  setInterval(()=>{
+    const wasNight=document.documentElement.classList.contains("night"); applyTheme();
+    const n=new Date(); n.setHours(0,0,0,0);
+    if(key(n)!==todayK){ if(calSel===todayK) calSel=key(n); today=n; todayK=key(n); render(); }
+    else if(wasNight!==isNight()) render();
+  },60000);
+
+  // ---------- storage ----------
+  const LS="daily-words-ledger";
+  const local={
+    load(){ try{ const d=JSON.parse(localStorage.getItem(LS)||"null"); if(d){ settings=normSettings(d.settings); const src=d.days||d.entries||{}; for(const k in src) days[k]=normDay(src[k]); } }catch(_){} },
+    persist(){ try{ localStorage.setItem(LS,JSON.stringify({days,settings})); }catch(_){} },
+    async saveDay(){ local.persist(); }, async clearDay(){ local.persist(); }, async saveSettings(){ local.persist(); }
+  };
+  applyTheme();
+  store=local; local.load(); settings=normSettings(settings);
+  go((location.hash||"").slice(1)||"today");
+
+  // keep data from being cleared, and work offline
+  try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch(_){}
+  if("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("sw.js").catch(()=>{});
+})();
+</script>
+</body>
+</html>
