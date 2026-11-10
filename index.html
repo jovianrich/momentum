@@ -22,6 +22,7 @@
   --field:#f6f8fb; --fieldline:#cdd6e0; --track:#e6ecf2;
   --blue:#1083fe; --blue-ink:#0a66d6; --blue-tint:#e3f0ff; --on-blue:#ffffff;
   --gold:#f5b83d; --gold-ink:#8a5a06; --gold-tint:#fdf3dc;
+  --silver:#b9c3ce; --silver-ink:#4f5d6c; --silver-tint:#eef2f6;
   --pink:#ff4f8b; --pink-ink:#b81f5a; --pink-tint:#ffe3ee;
   --band:#161e27; --band-ink:#f1f3f5; --band-muted:#8b98a9; --band-track:#2c3a4b;
   --glow:rgba(16,131,254,0.12); --scrim:rgba(15,23,32,0.45);
@@ -34,6 +35,7 @@
   --field:#161e27; --fieldline:#34465b; --track:#253242;
   --blue:#1083fe; --blue-ink:#4ba3ff; --blue-tint:#1b3350; --on-blue:#ffffff;
   --gold:#f5b83d; --gold-ink:#f5c463; --gold-tint:#3a3220;
+  --silver:#c3ccd6; --silver-ink:#d5dce4; --silver-tint:#2a3442;
   --pink:#ff4f8b; --pink-ink:#ff8fb1; --pink-tint:#3e2430;
   --band:#1e2936; --band-ink:#f1f3f5; --band-muted:#8b98a9; --band-track:#34465b;
   --glow:rgba(16,131,254,0.16); --scrim:rgba(0,0,0,0.55);
@@ -90,6 +92,12 @@ h2{font-size:17px}
 .legend{display:flex;flex-wrap:wrap;justify-content:center;gap:12px;font-size:11px;color:var(--muted)}
 .legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:-1px}
 .big-input{height:44px;font-family:var(--mono);font-size:22px;font-weight:600;border:1.5px solid var(--blue);width:100%}
+.trophy-link.silver{border-color:var(--silver);background:var(--silver-tint)}
+.trophy-link.silver .cup{border-color:var(--silver)}.trophy-link.silver .cup svg{stroke:var(--silver-ink)}
+.trophy-link.silver .gold-bar{background:color-mix(in srgb,var(--silver) 35%,transparent)}.trophy-link.silver .gold-bar>span{background:var(--silver)}
+.medal{display:flex;align-items:center;gap:10px;min-width:0}
+.medal i{width:46px;height:46px;flex:0 0 auto;border-radius:13px;display:grid;place-items:center}
+.medal b{font-family:var(--mono);font-size:28px;font-weight:600;line-height:1}
 .trophy-link{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:1.5px solid var(--gold);background:var(--gold-tint);border-radius:14px;padding:10px 12px;color:var(--ink)}
 .cup{width:44px;height:44px;flex:0 0 auto;border-radius:12px;background:var(--surface);border:1.5px solid var(--gold);display:grid;place-items:center}
 .cup svg{stroke:var(--gold-ink)}
@@ -309,12 +317,26 @@ h2{font-size:17px}
   function trophies(){
     const total=totalWords(), rs=runs(), cur=streak();
     const wordCount=Math.floor(total/5000);
+    // silver: every 5,000 words overall. gold: every 5,000 words written inside one unbroken streak
+    let gold=0, runWords=0, prev=null;
+    for(const k of Object.keys(days).sort()){
+      if(k>todayK) break;
+      if(k===todayK && !met(k)) break;           // today isn't done yet; it can't break the streak
+      if((prev && diff(prev,k)!==1) || !met(k)){ gold+=Math.floor(runWords/5000); runWords=0; }
+      if(met(k)) runWords+=W(k);
+      prev=k;
+    }
+    const lastMet = met(todayK) ? todayK : key(addDays(today,-1));
+    if(!prev || prev!==lastMet || !met(prev)) { gold+=Math.floor(runWords/5000); runWords=0; }
+    else gold+=Math.floor(runWords/5000);
+    const streakWords = cur>0 ? runWords : 0;          // words in the streak that's still alive
+    const goldInto = streakWords%5000;
     const streaks=STREAK_TROPHIES.map(([n,name])=>({n,name,count:rs.filter(r=>r>=n).length}));
     const best=rs.length?Math.max(...rs):0;
     const next=STREAK_TROPHIES.find(([n])=>n>cur) || STREAK_TROPHIES[STREAK_TROPHIES.length-1];
     const drafts=settings.projects.filter(p=>p.draftDoneAt).length, revs=settings.projects.filter(p=>p.revDoneAt).length;
-    return {total, wordCount, nextWords:(wordCount+1)*5000, streaks, best, cur, next, drafts, revs,
-      earned: wordCount + streaks.reduce((s,x)=>s+x.count,0) + drafts + revs};
+    return {total, wordCount, gold, silver:wordCount, streakWords, goldInto, nextWords:(wordCount+1)*5000, streaks, best, cur, next, drafts, revs,
+      earned: wordCount + gold + streaks.reduce((s,x)=>s+x.count,0) + drafts + revs};
   }
   const earnedKeys = () => { const t=trophies(); return ["w"+t.wordCount].concat(t.streaks.map(s=>s.n+":"+s.count)); };
 
@@ -411,9 +433,11 @@ h2{font-size:17px}
       '<div class="stat"><span class="sub">targets met</span><b>'+ys.hit+'</b></div>'+
     '</div>'+
     '<button class="trophy-link" data-act="go" data-v="trophies"><span class="cup">'+CUP+'</span>'+
-      '<span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px"><b style="font-size:14px">Next trophy: '+fmt(tr.nextWords)+' words</b>'+
-      '<span class="gold-bar"><span style="width:'+(100*(tr.total%5000)/5000)+'%"></span></span>'+
-      '<span class="mono" style="font-size:11px;color:var(--gold-ink)">'+fmt(tr.nextWords-tr.total)+' to go</span></span>'+
+      '<span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">'+
+      '<span class="between" style="font-size:12px"><b>Silver</b><span class="mono" style="color:var(--silver-ink)">'+fmt(tr.nextWords-tr.total)+' to go</span></span>'+
+      '<span class="gold-bar"><span style="width:'+(100*(tr.total%5000)/5000)+'%;background:var(--silver)"></span></span>'+
+      '<span class="between" style="font-size:12px"><b>Gold</b><span class="mono" style="color:var(--gold-ink)">'+(tr.cur?fmt(tr.goldInto)+' / 5,000 this streak':'start a streak')+'</span></span>'+
+      '<span class="gold-bar"><span style="width:'+(100*tr.goldInto/5000)+'%"></span></span></span>'+
       '<span style="color:var(--gold-ink)">'+ICON.right.replace('stroke-width','stroke="currentColor" stroke-width')+'</span></button>';
   }
 
@@ -620,12 +644,16 @@ h2{font-size:17px}
     const nx=t.next, nxPct=Math.min(100,100*t.cur/nx[0]);
     return ''+
     '<div class="between" style="align-items:flex-end"><div><div class="eyebrow">TROPHIES</div><h1>Trophy shelf</h1></div><span class="muted" style="font-size:13px">'+t.earned+' earned</span></div>'+
-    '<div class="band" style="display:flex;flex-direction:column;gap:8px;padding:12px 14px">'+
-      '<span class="label">Every 5,000 words</span>'+
-      '<div class="row" style="gap:14px"><span style="width:52px;height:52px;border-radius:14px;background:var(--gold);display:grid;place-items:center">'+CUP.replace('width="24" height="24"','width="34" height="34" stroke="#161e27"')+'</span>'+
-        '<div class="stat"><b style="font-size:34px;line-height:1">×'+t.wordCount+'</b><span class="sub" style="font-size:13px">'+fmt(t.total)+' words all time</span></div></div>'+
-      '<div class="between" style="font-size:12px"><span>Next: '+fmt(t.nextWords)+'</span><span class="mono sub">'+fmt(t.nextWords-t.total)+' to go</span></div>'+
-      '<div class="gold-bar" style="height:8px;background:var(--band-track)"><span style="width:'+(100*into/5000)+'%"></span></div>'+
+    '<div class="band" style="display:flex;flex-direction:column;gap:6px;padding:12px 14px">'+
+      '<span class="label">Word trophies</span>'+
+      '<div class="grid3" style="grid-template-columns:1fr 1fr;align-items:center">'+
+        '<div class="medal"><i style="background:var(--silver)">'+CUP.replace('width="24" height="24"','width="28" height="28" stroke="#161e27"')+'</i><div class="stat"><b>×'+t.silver+'</b><span class="sub" style="font-size:12px">silver · every 5,000</span></div></div>'+
+        '<div class="medal"><i style="background:var(--gold)">'+CUP.replace('width="24" height="24"','width="28" height="28" stroke="#161e27"')+'</i><div class="stat"><b>×'+t.gold+'</b><span class="sub" style="font-size:12px">gold · 5,000 in one streak</span></div></div>'+
+      '</div>'+
+      '<div class="between" style="font-size:12px"><span>Next silver: '+fmt(t.nextWords)+' total</span><span class="mono sub">'+fmt(t.nextWords-t.total)+' to go</span></div>'+
+      '<div class="gold-bar" style="height:6px;background:var(--band-track)"><span style="width:'+(100*into/5000)+'%;background:var(--silver)"></span></div>'+
+      '<div class="between" style="font-size:12px"><span>Next gold: this streak</span><span class="mono sub">'+(t.cur?fmt(t.goldInto)+' / 5,000':'start a streak')+'</span></div>'+
+      '<div class="gold-bar" style="height:6px;background:var(--band-track)"><span style="width:'+(100*t.goldInto/5000)+'%"></span></div>'+
     '</div>'+
     '<div class="between"><span class="label">Streaks &amp; milestones</span><span class="muted" style="font-size:12px">current '+t.cur+' · best '+t.best+'</span></div>'+
     '<div class="shelf">'+shelf+
@@ -707,7 +735,8 @@ h2{font-size:17px}
     days[k]=d; render();
     try{ await store.saveDay(k,d); }catch(e){ toast("Couldn't save. Check your connection and try again."); return; }
     const after=trophies();
-    if(after.wordCount>prevBest.wordCount) toast("Trophy! You passed "+fmt(after.wordCount*5000)+" words");
+    if(after.gold>prevBest.gold) toast("Gold trophy! 5,000 words in one unbroken streak");
+    else if(after.wordCount>prevBest.wordCount) toast("Silver trophy! You passed "+fmt(after.wordCount*5000)+" words");
     else { const s=after.streaks.find((x,i)=>x.count>prevBest.streaks[i].count); if(s) toast("Trophy! "+s.name+" streak: "+s.n+" days in a row"); else if(msg) toast(msg); }
   }
   async function clearDay(k){ delete days[k]; render(); try{ await store.clearDay(k); toast("Day cleared"); }catch(_){ toast("Couldn't clear that day. Try again."); } }
