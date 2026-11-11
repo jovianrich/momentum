@@ -79,6 +79,7 @@ textarea.field{height:auto;min-height:44px;padding:8px 10px;resize:vertical;widt
 h1,h2{margin:0;font-weight:800;text-wrap:balance}
 h1{font-size:23px;line-height:1.15}
 .wordmark{font-size:30px;letter-spacing:-.02em;line-height:1;display:inline-flex;align-items:center;white-space:nowrap}
+.divider{height:1px;background:var(--line);margin:2px -12px}
 .brand{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1 1 auto}
 .datestack{text-align:right;line-height:1.35;white-space:nowrap}
 .tagline{font-size:11.5px;color:var(--muted);letter-spacing:.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -529,6 +530,10 @@ button.tro:active,button.gem:active,button.medal:active{transform:scale(.97)}
         : '<div class="between"><span class="mono muted" style="font-size:11px">'+fmt(tot)+' words logged</span><button class="btn quiet" style="height:28px;padding:0;font-size:12px" data-act="go" data-v="projects">Set a target</button></div>';
     }
     const now=new Date(), night=isNight();
+    const wo='<div class="divider"></div>'+
+      '<div class="row"><label class="label" for="curProj" style="flex:0 0 auto">Writing on</label>'+
+      '<select id="curProj" class="field" style="flex:1;font-weight:800;font-size:16px">'+projOptions(settings.current)+'</select></div>'+
+      projLine;
     return ''+
     '<div class="between">'+
       '<div class="brand"><h1 class="wordmark" aria-label="momentum">m'+LOGO_O+'mentum</h1><span class="tagline">complete your vision. one target at a time.</span></div>'+
@@ -542,7 +547,7 @@ button.tro:active,button.gem:active,button.medal:active{transform:scale(.97)}
       '<span id="tierLine" style="font-size:14px;font-weight:800;text-align:center">'+(rt?revLine(CUT(todayK),CH(todayK),rt):tierLine(w,g))+'</span>'+
       '<div class="legend"><span><i style="background:var(--blue)"></i>Target</span><span><i style="background:var(--gold)"></i>Double</span><span><i style="background:var(--pink)"></i>Triple+</span></div>'+
     '</div>'+
-    (rt ? revForm(cur,rt) :
+    (rt ? revForm(cur,rt,wo) :
     '<form class="card" id="todayForm" style="display:flex;flex-direction:column;gap:10px">'+
       '<div class="row" style="align-items:flex-end">'+
         '<label for="todayWords" style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px"><span class="label">Today\'s word total</span>'+
@@ -551,12 +556,7 @@ button.tro:active,button.gem:active,button.medal:active{transform:scale(.97)}
       '</div>'+
       '<div class="between"><label for="goalIn" class="muted" style="font-size:13px">My daily target</label>'+
         '<div class="row"><input id="goalIn" class="field mono" type="number" inputmode="numeric" min="50" step="50" value="'+settings.goal+'" style="width:84px;height:34px;text-align:right"><span class="muted" style="font-size:13px">words</span></div></div>'+
-    '</form>')+
-    '<div class="card" style="display:flex;flex-direction:column;gap:8px">'+
-      '<div class="row"><label class="label" for="curProj" style="flex:0 0 auto">Writing on</label>'+
-      '<select id="curProj" class="field" style="flex:1;font-weight:800;font-size:16px">'+projOptions(settings.current)+'</select></div>'+
-      projLine+
-    '</div>'+
+    wo+'</form>')+
     '<div class="band grid3">'+
       '<div class="stat"><span class="label">'+today.getFullYear()+' words</span><b style="font-size:20px">'+fmt(ys.w)+'</b></div>'+
       '<div class="stat"><span class="sub">days written</span><b>'+ys.written+'</b></div>'+
@@ -571,7 +571,7 @@ button.tro:active,button.gem:active,button.medal:active{transform:scale(.97)}
       '<span style="color:var(--gold-ink)">'+ICON.right.replace('stroke-width','stroke="currentColor" stroke-width')+'</span></button>';
   }
 
-  function revForm(cur,rt){
+  function revForm(cur,rt,wo){
     const d=days[todayK], has=d&&(d.cut>0||d.chapters>0);
     return '<form class="card" id="todayForm" data-mode="rev" style="display:flex;flex-direction:column;gap:10px">'+
       '<div class="row" style="align-items:flex-end">'+
@@ -583,7 +583,7 @@ button.tro:active,button.gem:active,button.medal:active{transform:scale(.97)}
       '</div>'+
       '<div class="between"><span class="muted" style="font-size:13px">Daily target: '+targetText(rt)+'</span>'+
         '<button class="btn quiet" type="button" data-act="revgoals" data-v="'+esc(cur.id)+'" style="height:28px;padding:0;font-size:12px">Change</button></div>'+
-    '</form>';
+    (wo||'')+'</form>';
   }
 
   function viewCalendar(){
