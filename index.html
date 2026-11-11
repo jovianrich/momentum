@@ -79,6 +79,10 @@ textarea.field{height:auto;min-height:44px;padding:8px 10px;resize:vertical;widt
 h1,h2{margin:0;font-weight:800;text-wrap:balance}
 h1{font-size:23px;line-height:1.15}
 .wordmark{font-size:30px;letter-spacing:-.02em;line-height:1;display:inline-flex;align-items:center;white-space:nowrap}
+.seg2{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.seg2 button{border:0;background:none;padding:5px 10px;font-size:12px;font-weight:700;color:var(--muted)}
+.seg2 button[aria-pressed="true"]{background:var(--blue-tint);color:var(--blue-ink)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 .divider{height:1px;background:var(--line);margin:2px -12px}
 .brand{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1 1 auto}
 .datestack{text-align:right;line-height:1.35;white-space:nowrap}
@@ -274,6 +278,7 @@ button.tro:active,button.gem:active,button.medal:active{transform:scale(.97)}
       return {words:w, goal:+v.goal||0, project:p, note:v.note||"", cut:0, chapters:0, rev:null};
     }
     return {words:+v.words||0, goal:+v.goal||0, project:v.project||"", note:v.note||"", cut:+v.cut||0, chapters:+v.chapters||0,
+      startCount:+v.startCount||0, endCount:+v.endCount||0,
       rev:v.rev&&(+v.rev.cut>0||+v.rev.ch>0)?{cut:+v.rev.cut||0, ch:+v.rev.ch||0}:null};
   }
 
@@ -549,11 +554,7 @@ button.tro:active,button.gem:active,button.medal:active{transform:scale(.97)}
     '</div>'+
     (rt ? revForm(cur,rt,wo) :
     '<form class="card" id="todayForm" style="display:flex;flex-direction:column;gap:10px">'+
-      '<div class="row" style="align-items:flex-end">'+
-        '<label for="todayWords" style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px"><span class="label">Today\'s word total</span>'+
-        '<input id="todayWords" class="field big-input" type="number" inputmode="numeric" min="0" placeholder="0" value="'+(days[todayK]?w:"")+'"></label>'+
-        '<button class="btn primary" type="submit" style="height:44px;padding:0 20px">Save</button>'+
-      '</div>'+
+      entryRow(w)+
       '<div class="between"><label for="goalIn" class="muted" style="font-size:13px">My daily target</label>'+
         '<div class="row"><input id="goalIn" class="field mono" type="number" inputmode="numeric" min="50" step="50" value="'+settings.goal+'" style="width:84px;height:34px;text-align:right"><span class="muted" style="font-size:13px">words</span></div></div>'+
     wo+'</form>')+
@@ -571,6 +572,42 @@ button.tro:active,button.gem:active,button.medal:active{transform:scale(.97)}
       '<span style="color:var(--gold-ink)">'+ICON.right.replace('stroke-width','stroke="currentColor" stroke-width')+'</span></button>';
   }
 
+  // two ways to log a day: type the total, or type the manuscript's word count before and after
+  let entryMode=(()=>{ try{ return localStorage.getItem("dwl-entry")==="range"?"range":"total"; }catch(_){ return "total"; } })();
+  function lastEnd(pid){
+    let best="", val=0;
+    for(const k in days){ const x=days[k]; if(k<todayK && x.project===pid && x.endCount>0 && k>best){ best=k; val=x.endCount; } }
+    return val || (projTotals()[pid]||0);
+  }
+  function entryRow(w){
+    const d=days[todayK];
+    const tog='<div class="between"><div class="seg2" role="group" aria-label="How to enter today">'+
+      '<button type="button" data-act="entry" data-v="total" aria-pressed="'+(entryMode==="total")+'">Word total</button>'+
+      '<button type="button" data-act="entry" data-v="range" aria-pressed="'+(entryMode==="range")+'">Start → end</button></div>'+
+      (entryMode==="range"?'<span class="mono muted" id="rangeOut" style="font-size:12px"></span>':'')+'</div>';
+    if(entryMode==="total") return tog+
+      '<div class="row" style="align-items:flex-end">'+
+        '<label for="todayWords" style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px"><span class="sr">Today\'s word total</span>'+
+        '<input id="todayWords" class="field big-input" type="number" inputmode="numeric" min="0" placeholder="Today\'s word total" value="'+(d?w:"")+'"></label>'+
+        '<button class="btn primary" type="submit" style="height:44px;padding:0 20px">Save</button>'+
+      '</div>';
+    const s0=d&&d.endCount?d.startCount:lastEnd(settings.current), e0=d&&d.endCount?d.endCount:"";
+    return tog+
+      '<div class="row" style="align-items:flex-end">'+
+        '<label for="startWC" style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px"><span class="label">Start</span>'+
+        '<input id="startWC" class="field big-input" style="font-size:18px" type="number" inputmode="numeric" min="0" placeholder="0" value="'+(s0||"")+'"></label>'+
+        '<label for="endWC" style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px"><span class="label">End</span>'+
+        '<input id="endWC" class="field big-input" style="font-size:18px" type="number" inputmode="numeric" min="0" placeholder="0" value="'+e0+'"></label>'+
+        '<button class="btn primary" type="submit" style="height:44px;padding:0 16px">Save</button>'+
+      '</div>';
+  }
+  function rangePreview(){
+    const s=parseInt(($("startWC")||{}).value,10), e=parseInt(($("endWC")||{}).value,10), out=$("rangeOut");
+    if(isNaN(s)||isNaN(e)){ if(out) out.textContent=""; return; }
+    const w=Math.max(0,e-s), g=G(todayK);
+    if(out) out.textContent = e<s ? "end is below start" : "= "+fmt(w)+" words";
+    $("ringArt").innerHTML=ringSVG(w,g); $("tierLine").innerHTML=tierLine(w,g);
+  }
   function revForm(cur,rt,wo){
     const d=days[todayK], has=d&&(d.cut>0||d.chapters>0);
     return '<form class="card" id="todayForm" data-mode="rev" style="display:flex;flex-direction:column;gap:10px">'+
@@ -908,6 +945,7 @@ button.tro:active,button.gem:active,button.medal:active{transform:scale(.97)}
     if(a==="go") go(v);
     else if(a==="theme") cycleTheme();
     else if(a==="tro") openTro(v);
+    else if(a==="entry"){ entryMode=v; try{ localStorage.setItem("dwl-entry",v); }catch(_){} render(); if(v==="range") setTimeout(rangePreview,0); }
     else if(a==="sheet"){ sheetKind="rates"; $("sheet").hidden=false; $("sheet").innerHTML=sheetHTML(); const c=$("sheet").querySelector(".iconbtn"); if(c) c.focus(); }
     else if(a==="closesheet"){ $("sheet").hidden=true; }
     else if(a==="range"){ sheetRange=v; $("sheet").innerHTML=sheetHTML(); }
@@ -971,9 +1009,17 @@ button.tro:active,button.gem:active,button.medal:active{transform:scale(.97)}
       completing=null; saveSettings(wasDraft?"":starting?p.name+" moved to revision":"Revision goals saved");
       if(wasDraft){ go("trophies"); openTro("draft"); }
     } else if(f.id==="todayForm"){
-      const raw=$("todayWords").value.trim(); if(raw===""){ toast("Enter today's word total"); return; }
-      const w=Math.max(0,parseInt(raw,10)||0);
-      saveDay(todayK,{words:w, project:days[todayK]&&days[todayK].project!==undefined&&days[todayK].words>0?days[todayK].project:settings.current},
+      let w, extra={};
+      if(entryMode==="range"){
+        const s=parseInt($("startWC").value,10), e=parseInt($("endWC").value,10);
+        if(isNaN(s)||isNaN(e)){ toast("Enter your starting and ending word counts"); return; }
+        if(e<s){ toast("Your ending count is lower than your starting count"); return; }
+        w=e-s; extra={startCount:s, endCount:e};
+      } else {
+        const raw=$("todayWords").value.trim(); if(raw===""){ toast("Enter today's word total"); return; }
+        w=Math.max(0,parseInt(raw,10)||0); extra={startCount:0, endCount:0};
+      }
+      saveDay(todayK,{words:w, ...extra, project:days[todayK]&&days[todayK].project!==undefined&&days[todayK].words>0?days[todayK].project:settings.current},
         w>=3*settings.goal?"Saved. Triple+!":w>=2*settings.goal?"Saved. Double target!":w>=settings.goal?"Saved. Target met!":"Saved. "+fmt(settings.goal-w)+" to go");
     } else if(f.id==="dayForm"){
       const raw=$("dayWords").value.trim(); const w=raw===""?0:Math.max(0,parseInt(raw,10)||0);
@@ -993,7 +1039,8 @@ button.tro:active,button.gem:active,button.medal:active{transform:scale(.97)}
   let gt;
   document.addEventListener("input", e=>{
     const t=e.target;
-    if(t.id==="todayWords"){ // live preview of the ring before saving
+    if(t.id==="startWC"||t.id==="endWC"){ rangePreview(); }
+    else if(t.id==="todayWords"){ // live preview of the ring before saving
       const w=Math.max(0,parseInt(t.value,10)||0), g=G(todayK);
       $("ringArt").innerHTML=ringSVG(w,g); $("tierLine").innerHTML=tierLine(w,g);
     } else if(t.id==="revCh"||t.id==="revCut"){
