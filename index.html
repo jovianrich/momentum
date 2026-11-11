@@ -50,6 +50,8 @@ button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
 html,button,a,input,select,textarea,label{touch-action:manipulation}
 :focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.app{opacity:0;transition:opacity .18s ease-out}
+.app.ready{opacity:1}
 .app{height:100%;display:flex;flex-direction:column;max-width:460px;margin:0 auto;position:relative;background-image:radial-gradient(circle at 50% 34%,var(--glow),transparent 46%)}
 main{flex:1 1 auto;overflow-y:auto;padding-top:calc(16px + env(safe-area-inset-top,0px));padding-bottom:10px;padding-left:max(18px,env(safe-area-inset-left,0px));padding-right:max(18px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:10px}
 .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
@@ -861,8 +863,20 @@ button.tro:active,button.gem:active,button.medal:active{transform:scale(.97)}
       sh.style.setProperty("--tile",Math.max(h0,Math.min(200,h0+Math.floor(spare()/2)))+"px");
     }
   }
-  window.addEventListener("resize",fitRing);
-  if(document.fonts && document.fonts.ready) document.fonts.ready.then(fitRing);
+  // refit whenever the screen size or fonts change, and only show the app once it has been sized,
+  // so it never opens too long and then shrinks
+  let fitQueued=false;
+  const refit=()=>{ if(fitQueued) return; fitQueued=true; requestAnimationFrame(()=>{ fitQueued=false; fitRing(); }); };
+  window.addEventListener("resize",refit);
+  if(window.visualViewport) visualViewport.addEventListener("resize",refit);
+  window.addEventListener("pageshow",refit);
+  if(document.fonts){ document.fonts.addEventListener && document.fonts.addEventListener("loadingdone",refit); }
+  if(window.ResizeObserver) new ResizeObserver(refit).observe(document.getElementById("app"));
+  (function reveal(){
+    const show=()=>{ fitRing(); requestAnimationFrame(()=>{ fitRing(); $("app").classList.add("ready"); }); };
+    const fontsReady = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
+    Promise.race([fontsReady, new Promise(r=>setTimeout(r,800))]).then(show, show);
+  })();
   function go(v){ if(!TABS.some(t=>t[0]===v)) v="today"; view=v; editingProj=null; armedDelete=false; $("sheet").hidden=true; try{ if(location.hash!=="#"+v) history.replaceState(null,"","#"+v); }catch(_){ } render(); $("view").scrollTop=0; }
   window.addEventListener("hashchange",()=>{ const v=location.hash.slice(1); if(v&&v!==view) go(v); });
 
