@@ -535,11 +535,6 @@ button.tro:active,button.gem:active,button.medal:active{transform:scale(.97)}
       '<div class="row" style="gap:10px;flex:0 0 auto"><span class="eyebrow datestack">'+DOW[now.getDay()].slice(0,3).toUpperCase()+'<br>'+MON[now.getMonth()].slice(0,3).toUpperCase()+' '+now.getDate()+'</span>'+
       '<button class="iconbtn" data-act="theme" aria-label="Color mode: '+(themePref()==="auto"?"follows time of day":themePref())+'. Tap to change." title="'+(themePref()==="auto"?"Auto: day 6am–7pm, night after":"Fixed "+themePref()+" colors")+'">'+(night?ICON.moon:ICON.sun)+'</button></div>'+
     '</div>'+
-    '<div class="card" style="display:flex;flex-direction:column;gap:8px">'+
-      '<div class="row"><label class="label" for="curProj" style="flex:0 0 auto">Writing on</label>'+
-      '<select id="curProj" class="field" style="flex:1;font-weight:800;font-size:16px">'+projOptions(settings.current)+'</select></div>'+
-      projLine+
-    '</div>'+
     '<div class="ringwrap">'+
       '<div class="ring"><div id="ringArt">'+(rt?ringSVG(revRatio(CUT(todayK),CH(todayK),rt),1):ringSVG(w,g))+'</div>'+
         '<button class="streakbtn" data-act="sheet" aria-label="'+st+'-day streak. Show on-target rates"><span class="n mono">'+st+'</span><span class="t">day streak</span><span class="pill" style="margin-top:4px">On-target rates ›</span></button>'+
@@ -557,6 +552,11 @@ button.tro:active,button.gem:active,button.medal:active{transform:scale(.97)}
       '<div class="between"><label for="goalIn" class="muted" style="font-size:13px">My daily target</label>'+
         '<div class="row"><input id="goalIn" class="field mono" type="number" inputmode="numeric" min="50" step="50" value="'+settings.goal+'" style="width:84px;height:34px;text-align:right"><span class="muted" style="font-size:13px">words</span></div></div>'+
     '</form>')+
+    '<div class="card" style="display:flex;flex-direction:column;gap:8px">'+
+      '<div class="row"><label class="label" for="curProj" style="flex:0 0 auto">Writing on</label>'+
+      '<select id="curProj" class="field" style="flex:1;font-weight:800;font-size:16px">'+projOptions(settings.current)+'</select></div>'+
+      projLine+
+    '</div>'+
     '<div class="band grid3">'+
       '<div class="stat"><span class="label">'+today.getFullYear()+' words</span><b style="font-size:20px">'+fmt(ys.w)+'</b></div>'+
       '<div class="stat"><span class="sub">days written</span><b>'+ys.written+'</b></div>'+
