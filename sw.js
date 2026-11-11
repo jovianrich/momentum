@@ -1,5 +1,5 @@
 // Momentum: offline support. Bump VERSION whenever the app files change.
-const VERSION = "momentum-v19";
+const VERSION = "momentum-v20";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png", "./apple-touch-icon.png"];
 
 self.addEventListener("install", e => {
