@@ -440,8 +440,11 @@ button.tro:active,button.gem:active,button.medal:active{transform:scale(.97)}
       '<path d="M12 5h16v9a8 8 0 0 1-16 0V5z" fill="'+cup+'" stroke="'+line+'" stroke-width="1.6" stroke-linejoin="round"/>'+
       '<path d="M28 7h4v3a5 5 0 0 1-5 5M12 7H8v3a5 5 0 0 0 5 5" fill="none" stroke="'+line+'" stroke-width="1.6" stroke-linecap="round"/>'+
       '<path d="M20 22v6M14 34h12M16 34l1-6h6l1 6" fill="'+cup+'" stroke="'+line+'" stroke-width="1.6" stroke-linejoin="round"/>'+
-      (locked?'':'<path d="M15.5 10.5l2-2.5h5l2 2.5-4.5 6z" fill="'+color+'" stroke="#161e27" stroke-width=".8" stroke-linejoin="round"/>'+
-        '<path d="M15.5 10.5h9M17.5 8l1.5 2.5 1 6M22.5 8 21 10.5l-1 6" fill="none" stroke="rgba(255,255,255,.75)" stroke-width=".6"/>')+
+      (locked?'':'<ellipse cx="20" cy="11.5" rx="7.5" ry="6.5" fill="'+color+'" opacity=".28"/>'+
+        '<path d="M13.2 9.8 16 6.4h8l2.8 3.4L20 18.2z" fill="'+color+'" stroke="#161e27" stroke-width=".9" stroke-linejoin="round"/>'+
+        '<path d="M13.2 9.8h13.6M16 6.4l2.2 3.4L20 18.2M24 6.4l-2.2 3.4L20 18.2M18.2 9.8 20 6.4l1.8 3.4" fill="none" stroke="rgba(255,255,255,.8)" stroke-width=".6" stroke-linejoin="round"/>'+
+        '<path d="M16.6 7.6l1.4 1.8-2.5.2z" fill="rgba(255,255,255,.65)"/>'+
+        '<path d="M27.6 4.2v3.2M26 5.8h3.2" stroke="#fff" stroke-width=".9" stroke-linecap="round"/>')+
       '</svg>';
   }
   function trophies(){
