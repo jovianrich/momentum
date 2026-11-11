@@ -79,6 +79,9 @@ textarea.field{height:auto;min-height:44px;padding:8px 10px;resize:vertical;widt
 h1,h2{margin:0;font-weight:800;text-wrap:balance}
 h1{font-size:23px;line-height:1.15}
 .wordmark{font-size:30px;letter-spacing:-.02em;line-height:1;display:inline-flex;align-items:center;white-space:nowrap}
+.brand{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1 1 auto}
+.datestack{text-align:right;line-height:1.35;white-space:nowrap}
+.tagline{font-size:11.5px;color:var(--muted);letter-spacing:.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .logo-o{width:.82em;height:.82em;margin:0 .02em;flex:0 0 auto;position:relative;top:.03em}
 h2{font-size:17px}
 .eyebrow{font-family:var(--mono);font-size:12px;color:var(--muted);letter-spacing:.08em}
@@ -528,8 +531,8 @@ button.tro:active,button.gem:active,button.medal:active{transform:scale(.97)}
     const now=new Date(), night=isNight();
     return ''+
     '<div class="between">'+
-      '<h1 class="wordmark" aria-label="Momentum">M'+LOGO_O+'mentum</h1>'+
-      '<div class="row" style="gap:10px"><span class="eyebrow">'+DOW[now.getDay()].slice(0,3).toUpperCase()+' · '+MON[now.getMonth()].slice(0,3).toUpperCase()+' '+now.getDate()+'</span>'+
+      '<div class="brand"><h1 class="wordmark" aria-label="momentum">m'+LOGO_O+'mentum</h1><span class="tagline">complete your vision. one target at a time.</span></div>'+
+      '<div class="row" style="gap:10px;flex:0 0 auto"><span class="eyebrow datestack">'+DOW[now.getDay()].slice(0,3).toUpperCase()+'<br>'+MON[now.getMonth()].slice(0,3).toUpperCase()+' '+now.getDate()+'</span>'+
       '<button class="iconbtn" data-act="theme" aria-label="Color mode: '+(themePref()==="auto"?"follows time of day":themePref())+'. Tap to change." title="'+(themePref()==="auto"?"Auto: day 6am–7pm, night after":"Fixed "+themePref()+" colors")+'">'+(night?ICON.moon:ICON.sun)+'</button></div>'+
     '</div>'+
     '<div class="card" style="display:flex;flex-direction:column;gap:8px">'+
