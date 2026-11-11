@@ -805,7 +805,20 @@ button.tro:active,button.gem:active,button.medal:active{transform:scale(.97)}
 
   // ---------- render + routing ----------
   const TABS=[["today","Today"],["calendar","Calendar"],["projects","Projects"],["trophies","Trophies"]];
+  // projects that moved past drafting without the button (imports, stage edits) still earn their draft trophy:
+  // dated to the last day words were logged to them
+  function backfillDrafts(){
+    let changed=false;
+    settings.projects.forEach(p=>{
+      if(p.draftDoneAt || !["Revising","Editing","Querying","Done"].includes(p.stage)) return;
+      let last="", tot=0;
+      for(const k in days){ const x=days[k]; if(x.project!==p.id) continue; tot+=x.words||0; if(x.words>0 && k>last) last=k; }
+      p.draftDoneAt=last||todayK; p.draftWords=p.draftWords||tot; changed=true;
+    });
+    if(changed && store) store.saveSettings(settings).catch(()=>{});
+  }
   function render(){
+    backfillDrafts();
     const scroll=$("view").scrollTop, same=$("view").dataset.v===view;
     $("view").innerHTML = view==="calendar"?viewCalendar():view==="projects"?viewProjects():view==="trophies"?viewTrophies():viewToday();
     $("view").dataset.v=view; if(same) $("view").scrollTop=scroll;
